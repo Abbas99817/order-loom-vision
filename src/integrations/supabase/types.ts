@@ -14,16 +14,181 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      process_steps: {
+        Row: {
+          assigned_quantity: number
+          assigned_to: string | null
+          completed_quantity: number
+          created_at: string
+          id: string
+          status: string
+          step_name: string
+          step_order: number
+          updated_at: string
+          work_order_id: string
+        }
+        Insert: {
+          assigned_quantity?: number
+          assigned_to?: string | null
+          completed_quantity?: number
+          created_at?: string
+          id?: string
+          status?: string
+          step_name: string
+          step_order?: number
+          updated_at?: string
+          work_order_id: string
+        }
+        Update: {
+          assigned_quantity?: number
+          assigned_to?: string | null
+          completed_quantity?: number
+          created_at?: string
+          id?: string
+          status?: string
+          step_name?: string
+          step_order?: number
+          updated_at?: string
+          work_order_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "process_steps_work_order_id_fkey"
+            columns: ["work_order_id"]
+            isOneToOne: false
+            referencedRelation: "work_orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      profiles: {
+        Row: {
+          created_at: string
+          full_name: string
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          full_name?: string
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          full_name?: string
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      progress_logs: {
+        Row: {
+          created_at: string
+          id: string
+          notes: string | null
+          process_step_id: string
+          quantity_completed: number
+          updated_by: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          notes?: string | null
+          process_step_id: string
+          quantity_completed?: number
+          updated_by: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          notes?: string | null
+          process_step_id?: string
+          quantity_completed?: number
+          updated_by?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "progress_logs_process_step_id_fkey"
+            columns: ["process_step_id"]
+            isOneToOne: false
+            referencedRelation: "process_steps"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      user_roles: {
+        Row: {
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Insert: {
+          id?: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Update: {
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
+        }
+        Relationships: []
+      }
+      work_orders: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          description: string
+          id: string
+          status: string
+          total_quantity: number
+          updated_at: string
+          wo_number: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          description?: string
+          id?: string
+          status?: string
+          total_quantity?: number
+          updated_at?: string
+          wo_number: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          description?: string
+          id?: string
+          status?: string
+          total_quantity?: number
+          updated_at?: string
+          wo_number?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      has_role: {
+        Args: {
+          _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
     }
     Enums: {
-      [_ in never]: never
+      app_role: "admin" | "supervisor" | "employee"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -150,6 +315,8 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      app_role: ["admin", "supervisor", "employee"],
+    },
   },
 } as const
