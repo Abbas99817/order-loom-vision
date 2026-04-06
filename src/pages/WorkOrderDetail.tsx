@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
@@ -11,7 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Progress } from '@/components/ui/progress';
 import { useToast } from '@/hooks/use-toast';
-import { ArrowLeft, Plus, Save } from 'lucide-react';
+import { ArrowLeft, Plus, Save, Pencil } from 'lucide-react';
 import { Textarea } from '@/components/ui/textarea';
 
 interface WorkOrder {
@@ -63,6 +63,9 @@ export default function WorkOrderDetail() {
   const [updateDialogOpen, setUpdateDialogOpen] = useState<string | null>(null);
   const [updateQty, setUpdateQty] = useState('');
   const [updateNotes, setUpdateNotes] = useState('');
+  const [editStepId, setEditStepId] = useState<string | null>(null);
+  const [editStepQuantity, setEditStepQuantity] = useState('');
+  const [editStepAssignee, setEditStepAssignee] = useState('');
 
   const canManageSteps = hasRole('admin') || hasRole('supervisor');
 
@@ -74,7 +77,6 @@ export default function WorkOrderDetail() {
     const { data: stepsData } = await supabase.from('process_steps').select('*').eq('work_order_id', id).order('step_order');
     if (stepsData) {
       setSteps(stepsData);
-      // Fetch logs for each step
       const logMap: Record<string, ProgressLog[]> = {};
       for (const step of stepsData) {
         const { data: logData } = await supabase.from('progress_logs').select('*').eq('process_step_id', step.id).order('created_at', { ascending: false });
@@ -89,10 +91,36 @@ export default function WorkOrderDetail() {
 
   useEffect(() => { fetchAll(); }, [id]);
 
+  // Calculate WO progress based on total WO quantity
+  const totalCompleted = steps.reduce((sum, s) => sum + s.completed_quantity, 0);
+  const woProgress = wo && wo.total_quantity > 0
+    ? Math.min(100, Math.round((totalCompleted / wo.total_quantity) * 100))
+    : 0;
+  const totalAssigned = steps.reduce((sum, s) => sum + s.assigned_quantity, 0);
+  const unassignedQuantity = wo ? wo.total_quantity - totalAssigned : 0;
+
+  const updateWoStatus = async () => {
+    if (!wo || !id) return;
+    if (totalCompleted >= wo.total_quantity && wo.total_quantity > 0) {
+      await supabase.from('work_orders').update({ status: 'completed' }).eq('id', id);
+    } else if (totalCompleted > 0 && wo.status !== 'in_progress') {
+      await supabase.from('work_orders').update({ status: 'in_progress' }).eq('id', id);
+    }
+  };
+
   const addStep = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!id) return;
-    const qty = parseInt(newStepQuantity) || wo?.total_quantity || 0;
+    if (!id || !wo) return;
+    const qty = parseInt(newStepQuantity) || 0;
+    if (qty <= 0) {
+      toast({ title: 'Error', description: 'Quantity must be greater than 0.', variant: 'destructive' });
+      return;
+    }
+    if (qty > unassignedQuantity) {
+      toast({ title: 'Error', description: `Only ${unassignedQuantity} units remain unassigned.`, variant: 'destructive' });
+      return;
+    }
+
     const { error } = await supabase.from('process_steps').insert({
       work_order_id: id,
       step_name: newStepName,
@@ -108,18 +136,24 @@ export default function WorkOrderDetail() {
       setNewStepName('');
       setNewStepQuantity('');
       setNewStepAssignee('');
-      fetchAll();
-
-      // Update WO status if it's still open
-      if (wo?.status === 'open') {
+      if (wo.status === 'open') {
         await supabase.from('work_orders').update({ status: 'in_progress' }).eq('id', id);
       }
+      fetchAll();
     }
   };
 
   const submitProgress = async (stepId: string) => {
     const qty = parseInt(updateQty);
     if (!qty || !user) return;
+    const step = steps.find(s => s.id === stepId);
+    if (!step) return;
+
+    const remaining = step.assigned_quantity - step.completed_quantity;
+    if (qty > remaining) {
+      toast({ title: 'Error', description: `Cannot exceed remaining ${remaining} units.`, variant: 'destructive' });
+      return;
+    }
 
     const { error } = await supabase.from('progress_logs').insert({
       process_step_id: stepId,
@@ -133,19 +167,56 @@ export default function WorkOrderDetail() {
       return;
     }
 
-    // Update step completed quantity
-    const step = steps.find(s => s.id === stepId);
-    if (step) {
-      const newCompleted = step.completed_quantity + qty;
-      const newStatus = newCompleted >= step.assigned_quantity ? 'completed' : 'in_progress';
-      await supabase.from('process_steps').update({ completed_quantity: newCompleted, status: newStatus }).eq('id', stepId);
-    }
+    const newCompleted = step.completed_quantity + qty;
+    const newStatus = newCompleted >= step.assigned_quantity ? 'completed' : 'in_progress';
+    await supabase.from('process_steps').update({ completed_quantity: newCompleted, status: newStatus }).eq('id', stepId);
 
     toast({ title: 'Progress Updated' });
     setUpdateDialogOpen(null);
     setUpdateQty('');
     setUpdateNotes('');
-    fetchAll();
+    await fetchAll();
+    // Check WO-level completion after refresh
+    const updatedTotalCompleted = steps.reduce((sum, s) => sum + (s.id === stepId ? newCompleted : s.completed_quantity), 0);
+    if (wo && updatedTotalCompleted >= wo.total_quantity && wo.total_quantity > 0) {
+      await supabase.from('work_orders').update({ status: 'completed' }).eq('id', id);
+      fetchAll();
+    }
+  };
+
+  const saveStepEdit = async (stepId: string) => {
+    const step = steps.find(s => s.id === stepId);
+    if (!step) return;
+    const newQty = parseInt(editStepQuantity);
+    if (isNaN(newQty) || newQty < step.completed_quantity) {
+      toast({ title: 'Error', description: `Quantity cannot be less than already completed (${step.completed_quantity}).`, variant: 'destructive' });
+      return;
+    }
+    // Check total assigned won't exceed WO quantity (excluding this step's current value)
+    const otherAssigned = totalAssigned - step.assigned_quantity;
+    if (newQty + otherAssigned > (wo?.total_quantity || 0)) {
+      toast({ title: 'Error', description: `Total assigned would exceed WO quantity. Max for this step: ${(wo?.total_quantity || 0) - otherAssigned}.`, variant: 'destructive' });
+      return;
+    }
+
+    const updates: Record<string, any> = { assigned_quantity: newQty };
+    if (editStepAssignee) updates.assigned_to = editStepAssignee;
+    if (newQty <= step.completed_quantity) updates.status = 'completed';
+
+    const { error } = await supabase.from('process_steps').update(updates).eq('id', stepId);
+    if (error) {
+      toast({ title: 'Error', description: error.message, variant: 'destructive' });
+    } else {
+      toast({ title: 'Step Updated' });
+      setEditStepId(null);
+      fetchAll();
+    }
+  };
+
+  const openEditDialog = (step: ProcessStep) => {
+    setEditStepId(step.id);
+    setEditStepQuantity(String(step.assigned_quantity));
+    setEditStepAssignee(step.assigned_to || '');
   };
 
   const getProfileName = (userId: string | null) => {
@@ -177,7 +248,7 @@ export default function WorkOrderDetail() {
         </Badge>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
         <Card className="stat-card">
           <CardContent className="p-4">
             <p className="text-sm text-muted-foreground">Total Quantity</p>
@@ -186,14 +257,24 @@ export default function WorkOrderDetail() {
         </Card>
         <Card className="stat-card">
           <CardContent className="p-4">
-            <p className="text-sm text-muted-foreground">Process Steps</p>
-            <p className="text-xl font-bold">{steps.length}</p>
+            <p className="text-sm text-muted-foreground">Assigned</p>
+            <p className="text-xl font-bold">{totalAssigned} / {wo.total_quantity}</p>
+            {unassignedQuantity > 0 && (
+              <p className="text-xs text-warning mt-1">{unassignedQuantity} unassigned</p>
+            )}
           </CardContent>
         </Card>
         <Card className="stat-card">
           <CardContent className="p-4">
-            <p className="text-sm text-muted-foreground">Completed Steps</p>
-            <p className="text-xl font-bold">{steps.filter(s => s.status === 'completed').length} / {steps.length}</p>
+            <p className="text-sm text-muted-foreground">Completed</p>
+            <p className="text-xl font-bold">{totalCompleted} / {wo.total_quantity}</p>
+          </CardContent>
+        </Card>
+        <Card className="stat-card">
+          <CardContent className="p-4">
+            <p className="text-sm text-muted-foreground">Overall Progress</p>
+            <p className="text-xl font-bold">{woProgress}%</p>
+            <Progress value={woProgress} className="mt-2 h-1.5" />
           </CardContent>
         </Card>
       </div>
@@ -203,20 +284,25 @@ export default function WorkOrderDetail() {
         {canManageSteps && (
           <Dialog open={addStepOpen} onOpenChange={setAddStepOpen}>
             <DialogTrigger asChild>
-              <Button size="sm"><Plus className="h-4 w-4 mr-1" />Add Step</Button>
+              <Button size="sm" disabled={unassignedQuantity <= 0}>
+                <Plus className="h-4 w-4 mr-1" />Add Step
+              </Button>
             </DialogTrigger>
             <DialogContent>
               <DialogHeader>
                 <DialogTitle>Add Process Step</DialogTitle>
               </DialogHeader>
               <form onSubmit={addStep} className="space-y-4">
+                <p className="text-sm text-muted-foreground">
+                  Available to assign: <strong>{unassignedQuantity}</strong> units
+                </p>
                 <div className="space-y-2">
                   <Label>Step Name</Label>
                   <Input value={newStepName} onChange={e => setNewStepName(e.target.value)} placeholder="e.g., Cutting, Threading" required />
                 </div>
                 <div className="space-y-2">
                   <Label>Quantity</Label>
-                  <Input type="number" value={newStepQuantity} onChange={e => setNewStepQuantity(e.target.value)} placeholder={String(wo.total_quantity)} />
+                  <Input type="number" value={newStepQuantity} onChange={e => setNewStepQuantity(e.target.value)} placeholder={String(unassignedQuantity)} max={unassignedQuantity} min="1" required />
                 </div>
                 <div className="space-y-2">
                   <Label>Assign To</Label>
@@ -238,7 +324,7 @@ export default function WorkOrderDetail() {
 
       <div className="space-y-3">
         {steps.map(step => {
-          const progress = step.assigned_quantity > 0 ? Math.round((step.completed_quantity / step.assigned_quantity) * 100) : 0;
+          const stepProgress = step.assigned_quantity > 0 ? Math.round((step.completed_quantity / step.assigned_quantity) * 100) : 0;
           const stepLogs = logs[step.id] || [];
           return (
             <Card key={step.id}>
@@ -251,6 +337,11 @@ export default function WorkOrderDetail() {
                   </div>
                   <div className="flex items-center gap-2">
                     <span className="text-sm text-muted-foreground">{getProfileName(step.assigned_to)}</span>
+                    {canManageSteps && (
+                      <Button size="sm" variant="ghost" onClick={() => openEditDialog(step)}>
+                        <Pencil className="h-3 w-3" />
+                      </Button>
+                    )}
                     {(canManageSteps || step.assigned_to === user?.id) && step.status !== 'completed' && (
                       <Dialog open={updateDialogOpen === step.id} onOpenChange={(open) => setUpdateDialogOpen(open ? step.id : null)}>
                         <DialogTrigger asChild>
@@ -281,9 +372,9 @@ export default function WorkOrderDetail() {
                 </div>
                 <div className="flex items-center gap-3 text-sm">
                   <span className="text-muted-foreground">{step.completed_quantity} / {step.assigned_quantity} units</span>
-                  <span className="font-medium">{progress}%</span>
+                  <span className="font-medium">{stepProgress}%</span>
                 </div>
-                <Progress value={progress} className="mt-2 h-1.5" />
+                <Progress value={stepProgress} className="mt-2 h-1.5" />
 
                 {stepLogs.length > 0 && (
                   <div className="mt-3 space-y-1.5 border-t pt-3">
@@ -306,6 +397,37 @@ export default function WorkOrderDetail() {
           </div>
         )}
       </div>
+
+      {/* Edit Step Dialog */}
+      <Dialog open={!!editStepId} onOpenChange={(open) => !open && setEditStepId(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit Step — {steps.find(s => s.id === editStepId)?.step_name}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label>Assigned Quantity</Label>
+              <Input type="number" value={editStepQuantity} onChange={e => setEditStepQuantity(e.target.value)} min={steps.find(s => s.id === editStepId)?.completed_quantity || 0} />
+              <p className="text-xs text-muted-foreground">
+                Min: {steps.find(s => s.id === editStepId)?.completed_quantity || 0} (already completed) · 
+                Max: {wo ? wo.total_quantity - totalAssigned + (steps.find(s => s.id === editStepId)?.assigned_quantity || 0) : 0}
+              </p>
+            </div>
+            <div className="space-y-2">
+              <Label>Reassign To</Label>
+              <Select value={editStepAssignee} onValueChange={setEditStepAssignee}>
+                <SelectTrigger><SelectValue placeholder="Select employee" /></SelectTrigger>
+                <SelectContent>
+                  {employees.map(emp => (
+                    <SelectItem key={emp.user_id} value={emp.user_id}>{emp.full_name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <Button onClick={() => editStepId && saveStepEdit(editStepId)} className="w-full">Save Changes</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
