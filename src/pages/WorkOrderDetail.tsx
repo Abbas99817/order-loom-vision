@@ -91,19 +91,31 @@ export default function WorkOrderDetail() {
 
   useEffect(() => { fetchAll(); }, [id]);
 
-  // Calculate WO progress based on total WO quantity
-  const totalCompleted = steps.reduce((sum, s) => sum + s.completed_quantity, 0);
-  const woProgress = wo && wo.total_quantity > 0
-    ? Math.min(100, Math.round((totalCompleted / wo.total_quantity) * 100))
-    : 0;
-  const totalAssigned = steps.reduce((sum, s) => sum + s.assigned_quantity, 0);
-  const unassignedQuantity = wo ? wo.total_quantity - totalAssigned : 0;
+  // Sequential model: each step processes all WO units
+  // Step progress = completed / WO total quantity (capped at 100%)
+  // WO progress = average of all step progresses (bottleneck-aware)
+  const getStepProgress = (step: ProcessStep) => {
+    if (!wo || wo.total_quantity === 0) return 0;
+    return Math.min(100, Math.round((step.completed_quantity / wo.total_quantity) * 100));
+  };
+
+  const woProgress = (() => {
+    if (!wo || wo.total_quantity === 0 || steps.length === 0) return 0;
+    // Use minimum step progress (bottleneck) for sequential workflow
+    const stepProgresses = steps.map(s => Math.min(100, (s.completed_quantity / wo.total_quantity) * 100));
+    return Math.round(Math.min(...stepProgresses));
+  })();
+
+  const totalCompletedAllSteps = steps.reduce((sum, s) => sum + Math.min(s.completed_quantity, wo?.total_quantity || 0), 0);
+  const completedStepsCount = steps.filter(s => wo && s.completed_quantity >= wo.total_quantity).length;
 
   const updateWoStatus = async () => {
     if (!wo || !id) return;
-    if (totalCompleted >= wo.total_quantity && wo.total_quantity > 0) {
+    // WO complete only when ALL steps have completed all WO units
+    const allDone = steps.length > 0 && steps.every(s => s.completed_quantity >= wo.total_quantity);
+    if (allDone) {
       await supabase.from('work_orders').update({ status: 'completed' }).eq('id', id);
-    } else if (totalCompleted > 0 && wo.status !== 'in_progress') {
+    } else if (steps.some(s => s.completed_quantity > 0) && wo.status !== 'in_progress') {
       await supabase.from('work_orders').update({ status: 'in_progress' }).eq('id', id);
     }
   };
@@ -111,13 +123,10 @@ export default function WorkOrderDetail() {
   const addStep = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!id || !wo) return;
-    const qty = parseInt(newStepQuantity) || 0;
+    // Default quantity to WO total (sequential: each step processes all units)
+    const qty = parseInt(newStepQuantity) || wo.total_quantity;
     if (qty <= 0) {
       toast({ title: 'Error', description: 'Quantity must be greater than 0.', variant: 'destructive' });
-      return;
-    }
-    if (qty > unassignedQuantity) {
-      toast({ title: 'Error', description: `Only ${unassignedQuantity} units remain unassigned.`, variant: 'destructive' });
       return;
     }
 
@@ -145,13 +154,14 @@ export default function WorkOrderDetail() {
 
   const submitProgress = async (stepId: string) => {
     const qty = parseInt(updateQty);
-    if (!qty || !user) return;
+    if (!qty || !user || !wo) return;
     const step = steps.find(s => s.id === stepId);
     if (!step) return;
 
-    const remaining = step.assigned_quantity - step.completed_quantity;
-    if (qty > remaining) {
-      toast({ title: 'Error', description: `Cannot exceed remaining ${remaining} units.`, variant: 'destructive' });
+    // Validate: completed cannot exceed WO total quantity
+    const maxRemaining = wo.total_quantity - step.completed_quantity;
+    if (qty > maxRemaining) {
+      toast({ title: 'Error', description: `Cannot exceed remaining ${maxRemaining} units for this WO.`, variant: 'destructive' });
       return;
     }
 
@@ -168,7 +178,7 @@ export default function WorkOrderDetail() {
     }
 
     const newCompleted = step.completed_quantity + qty;
-    const newStatus = newCompleted >= step.assigned_quantity ? 'completed' : 'in_progress';
+    const newStatus = newCompleted >= wo.total_quantity ? 'completed' : 'in_progress';
     await supabase.from('process_steps').update({ completed_quantity: newCompleted, status: newStatus }).eq('id', stepId);
 
     toast({ title: 'Progress Updated' });
@@ -176,9 +186,11 @@ export default function WorkOrderDetail() {
     setUpdateQty('');
     setUpdateNotes('');
     await fetchAll();
-    // Check WO-level completion after refresh
-    const updatedTotalCompleted = steps.reduce((sum, s) => sum + (s.id === stepId ? newCompleted : s.completed_quantity), 0);
-    if (wo && updatedTotalCompleted >= wo.total_quantity && wo.total_quantity > 0) {
+
+    // Check if ALL steps are now complete
+    const updatedSteps = steps.map(s => s.id === stepId ? { ...s, completed_quantity: newCompleted } : s);
+    const allDone = updatedSteps.every(s => s.completed_quantity >= wo.total_quantity);
+    if (allDone) {
       await supabase.from('work_orders').update({ status: 'completed' }).eq('id', id);
       fetchAll();
     }
@@ -186,16 +198,10 @@ export default function WorkOrderDetail() {
 
   const saveStepEdit = async (stepId: string) => {
     const step = steps.find(s => s.id === stepId);
-    if (!step) return;
+    if (!step || !wo) return;
     const newQty = parseInt(editStepQuantity);
     if (isNaN(newQty) || newQty < step.completed_quantity) {
       toast({ title: 'Error', description: `Quantity cannot be less than already completed (${step.completed_quantity}).`, variant: 'destructive' });
-      return;
-    }
-    // Check total assigned won't exceed WO quantity (excluding this step's current value)
-    const otherAssigned = totalAssigned - step.assigned_quantity;
-    if (newQty + otherAssigned > (wo?.total_quantity || 0)) {
-      toast({ title: 'Error', description: `Total assigned would exceed WO quantity. Max for this step: ${(wo?.total_quantity || 0) - otherAssigned}.`, variant: 'destructive' });
       return;
     }
 
@@ -257,17 +263,14 @@ export default function WorkOrderDetail() {
         </Card>
         <Card className="stat-card">
           <CardContent className="p-4">
-            <p className="text-sm text-muted-foreground">Assigned</p>
-            <p className="text-xl font-bold">{totalAssigned} / {wo.total_quantity}</p>
-            {unassignedQuantity > 0 && (
-              <p className="text-xs text-warning mt-1">{unassignedQuantity} unassigned</p>
-            )}
+            <p className="text-sm text-muted-foreground">Process Steps</p>
+            <p className="text-xl font-bold">{steps.length}</p>
           </CardContent>
         </Card>
         <Card className="stat-card">
           <CardContent className="p-4">
-            <p className="text-sm text-muted-foreground">Completed</p>
-            <p className="text-xl font-bold">{totalCompleted} / {wo.total_quantity}</p>
+            <p className="text-sm text-muted-foreground">Steps Completed</p>
+            <p className="text-xl font-bold">{completedStepsCount} / {steps.length}</p>
           </CardContent>
         </Card>
         <Card className="stat-card">
@@ -284,7 +287,7 @@ export default function WorkOrderDetail() {
         {canManageSteps && (
           <Dialog open={addStepOpen} onOpenChange={setAddStepOpen}>
             <DialogTrigger asChild>
-              <Button size="sm" disabled={unassignedQuantity <= 0}>
+              <Button size="sm">
                 <Plus className="h-4 w-4 mr-1" />Add Step
               </Button>
             </DialogTrigger>
@@ -294,15 +297,15 @@ export default function WorkOrderDetail() {
               </DialogHeader>
               <form onSubmit={addStep} className="space-y-4">
                 <p className="text-sm text-muted-foreground">
-                  Available to assign: <strong>{unassignedQuantity}</strong> units
+                  Each step processes units sequentially. Default: <strong>{wo.total_quantity}</strong> units.
                 </p>
                 <div className="space-y-2">
                   <Label>Step Name</Label>
                   <Input value={newStepName} onChange={e => setNewStepName(e.target.value)} placeholder="e.g., Cutting, Threading" required />
                 </div>
                 <div className="space-y-2">
-                  <Label>Quantity</Label>
-                  <Input type="number" value={newStepQuantity} onChange={e => setNewStepQuantity(e.target.value)} placeholder={String(unassignedQuantity)} max={unassignedQuantity} min="1" required />
+                  <Label>Quantity (units to process in this step)</Label>
+                  <Input type="number" value={newStepQuantity} onChange={e => setNewStepQuantity(e.target.value)} placeholder={String(wo.total_quantity)} min="1" />
                 </div>
                 <div className="space-y-2">
                   <Label>Assign To</Label>
@@ -324,8 +327,10 @@ export default function WorkOrderDetail() {
 
       <div className="space-y-3">
         {steps.map(step => {
-          const stepProgress = step.assigned_quantity > 0 ? Math.round((step.completed_quantity / step.assigned_quantity) * 100) : 0;
+          const stepProgress = getStepProgress(step);
+          const remaining = Math.max(0, wo.total_quantity - step.completed_quantity);
           const stepLogs = logs[step.id] || [];
+          const isStepDone = step.completed_quantity >= wo.total_quantity;
           return (
             <Card key={step.id}>
               <CardContent className="p-4">
@@ -333,7 +338,7 @@ export default function WorkOrderDetail() {
                   <div className="flex items-center gap-3">
                     <span className="text-xs font-medium text-muted-foreground bg-muted rounded-full h-6 w-6 flex items-center justify-center">{step.step_order}</span>
                     <span className="font-medium">{step.step_name}</span>
-                    {stepStatusBadge(step.status)}
+                    {stepStatusBadge(isStepDone ? 'completed' : step.completed_quantity > 0 ? 'in_progress' : 'pending')}
                   </div>
                   <div className="flex items-center gap-2">
                     <span className="text-sm text-muted-foreground">{getProfileName(step.assigned_to)}</span>
@@ -342,7 +347,7 @@ export default function WorkOrderDetail() {
                         <Pencil className="h-3 w-3" />
                       </Button>
                     )}
-                    {(canManageSteps || step.assigned_to === user?.id) && step.status !== 'completed' && (
+                    {(canManageSteps || step.assigned_to === user?.id) && !isStepDone && (
                       <Dialog open={updateDialogOpen === step.id} onOpenChange={(open) => setUpdateDialogOpen(open ? step.id : null)}>
                         <DialogTrigger asChild>
                           <Button size="sm" variant="outline"><Save className="h-3 w-3 mr-1" />Update</Button>
@@ -353,11 +358,11 @@ export default function WorkOrderDetail() {
                           </DialogHeader>
                           <div className="space-y-4">
                             <div className="text-sm text-muted-foreground">
-                              Remaining: {step.assigned_quantity - step.completed_quantity} units
+                              Completed: {step.completed_quantity} / {wo.total_quantity} · Remaining: {remaining} units
                             </div>
                             <div className="space-y-2">
                               <Label>Completed Quantity</Label>
-                              <Input type="number" value={updateQty} onChange={e => setUpdateQty(e.target.value)} min="1" max={step.assigned_quantity - step.completed_quantity} required />
+                              <Input type="number" value={updateQty} onChange={e => setUpdateQty(e.target.value)} min="1" max={remaining} required />
                             </div>
                             <div className="space-y-2">
                               <Label>Notes (optional)</Label>
@@ -371,7 +376,7 @@ export default function WorkOrderDetail() {
                   </div>
                 </div>
                 <div className="flex items-center gap-3 text-sm">
-                  <span className="text-muted-foreground">{step.completed_quantity} / {step.assigned_quantity} units</span>
+                  <span className="text-muted-foreground">{step.completed_quantity} / {wo.total_quantity} units</span>
                   <span className="font-medium">{stepProgress}%</span>
                 </div>
                 <Progress value={stepProgress} className="mt-2 h-1.5" />
@@ -409,8 +414,7 @@ export default function WorkOrderDetail() {
               <Label>Assigned Quantity</Label>
               <Input type="number" value={editStepQuantity} onChange={e => setEditStepQuantity(e.target.value)} min={steps.find(s => s.id === editStepId)?.completed_quantity || 0} />
               <p className="text-xs text-muted-foreground">
-                Min: {steps.find(s => s.id === editStepId)?.completed_quantity || 0} (already completed) · 
-                Max: {wo ? wo.total_quantity - totalAssigned + (steps.find(s => s.id === editStepId)?.assigned_quantity || 0) : 0}
+                Min: {steps.find(s => s.id === editStepId)?.completed_quantity || 0} (already completed)
               </p>
             </div>
             <div className="space-y-2">
