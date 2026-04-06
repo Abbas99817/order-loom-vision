@@ -24,8 +24,7 @@ interface WorkOrder {
 
 interface StepSummary {
   work_order_id: string;
-  total_completed: number;
-  total_assigned: number;
+  completed_quantity: number;
 }
 
 export default function WorkOrders() {
