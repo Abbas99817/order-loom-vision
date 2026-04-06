@@ -85,9 +85,11 @@ export default function WorkOrders() {
   };
 
   const getProgress = (woId: string) => {
+    const wo = workOrders.find(w => w.id === woId);
     const summary = stepSummaries.find(s => s.work_order_id === woId);
-    if (!summary || summary.total_assigned === 0) return 0;
-    return Math.round((summary.total_completed / summary.total_assigned) * 100);
+    if (!wo || wo.total_quantity === 0) return 0;
+    const completed = summary?.total_completed || 0;
+    return Math.min(100, Math.round((completed / wo.total_quantity) * 100));
   };
 
   const statusBadge = (status: string) => {
