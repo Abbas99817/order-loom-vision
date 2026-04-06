@@ -43,17 +43,19 @@ export default function WorkOrders() {
     const { data: wos } = await supabase.from('work_orders').select('*').order('created_at', { ascending: false });
     if (wos) setWorkOrders(wos);
 
-    const { data: steps } = await supabase.from('process_steps').select('work_order_id, completed_quantity, assigned_quantity');
+    const { data: steps } = await supabase.from('process_steps').select('work_order_id, completed_quantity');
     if (steps) {
-      const summaries: Record<string, StepSummary> = {};
+      // Group steps by WO - for sequential model, track min completion across steps
+      const grouped: Record<string, number[]> = {};
       steps.forEach(s => {
-        if (!summaries[s.work_order_id]) {
-          summaries[s.work_order_id] = { work_order_id: s.work_order_id, total_completed: 0, total_assigned: 0 };
-        }
-        summaries[s.work_order_id].total_completed += s.completed_quantity;
-        summaries[s.work_order_id].total_assigned += s.assigned_quantity;
+        if (!grouped[s.work_order_id]) grouped[s.work_order_id] = [];
+        grouped[s.work_order_id].push(s.completed_quantity);
       });
-      setStepSummaries(Object.values(summaries));
+      const summaries = Object.entries(grouped).map(([work_order_id, completions]) => ({
+        work_order_id,
+        completed_quantity: Math.min(...completions), // bottleneck (min across steps)
+      }));
+      setStepSummaries(summaries);
     }
   };
 
