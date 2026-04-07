@@ -1,12 +1,13 @@
 import { useAuth } from '@/hooks/useAuth';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { LayoutDashboard, ClipboardList, Settings, LogOut, Factory, Users, ListChecks } from 'lucide-react';
+import { LayoutDashboard, ClipboardList, Settings, LogOut, Factory, Users, ListChecks, Package } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
 
 const navItems = [
   { label: 'Dashboard', icon: LayoutDashboard, path: '/', roles: ['admin', 'supervisor'] as const },
   { label: 'Work Orders', icon: ClipboardList, path: '/work-orders', roles: ['admin', 'supervisor'] as const },
+  { label: 'Products', icon: Package, path: '/products', roles: ['admin', 'supervisor'] as const },
   { label: 'My Tasks', icon: ListChecks, path: '/my-tasks', roles: ['employee', 'supervisor'] as const },
   { label: 'Users', icon: Users, path: '/users', roles: ['admin'] as const },
 ];

@@ -8,6 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
 import { Plus, Search } from 'lucide-react';
@@ -20,6 +21,17 @@ interface WorkOrder {
   total_quantity: number;
   status: string;
   created_at: string;
+  product_id: string | null;
+}
+
+interface Product {
+  id: string;
+  name: string;
+}
+
+interface StepSummary {
+  work_order_id: string;
+  completed_quantity: number;
 }
 
 interface StepSummary {
@@ -30,11 +42,13 @@ interface StepSummary {
 export default function WorkOrders() {
   const [workOrders, setWorkOrders] = useState<WorkOrder[]>([]);
   const [stepSummaries, setStepSummaries] = useState<StepSummary[]>([]);
+  const [products, setProducts] = useState<Product[]>([]);
   const [search, setSearch] = useState('');
   const [dialogOpen, setDialogOpen] = useState(false);
   const [woNumber, setWoNumber] = useState('');
   const [description, setDescription] = useState('');
   const [totalQuantity, setTotalQuantity] = useState('');
+  const [selectedProductId, setSelectedProductId] = useState('');
   const { user, hasRole } = useAuth();
   const { toast } = useToast();
   const navigate = useNavigate();
@@ -59,7 +73,12 @@ export default function WorkOrders() {
     }
   };
 
-  useEffect(() => { fetchData(); }, []);
+  const fetchProducts = async () => {
+    const { data } = await supabase.from('products').select('id, name').order('name');
+    if (data) setProducts(data);
+  };
+
+  useEffect(() => { fetchData(); fetchProducts(); }, []);
 
   const createWorkOrder = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -71,6 +90,7 @@ export default function WorkOrders() {
       description,
       total_quantity: qty,
       created_by: user?.id,
+      product_id: selectedProductId || null,
     });
 
     if (error) {
@@ -81,6 +101,7 @@ export default function WorkOrders() {
       setWoNumber('');
       setDescription('');
       setTotalQuantity('');
+      setSelectedProductId('');
       fetchData();
     }
   };
@@ -128,6 +149,19 @@ export default function WorkOrders() {
                   <Textarea value={description} onChange={e => setDescription(e.target.value)} placeholder="Describe the work order..." />
                 </div>
                 <div className="space-y-2">
+                  <Label>Product</Label>
+                  <Select value={selectedProductId} onValueChange={setSelectedProductId}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select a product" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {products.map(p => (
+                        <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
                   <Label>Total Quantity</Label>
                   <Input type="number" value={totalQuantity} onChange={e => setTotalQuantity(e.target.value)} placeholder="100" min="1" required />
                 </div>
@@ -153,6 +187,9 @@ export default function WorkOrders() {
                   <div className="flex items-center gap-3">
                     <span className="font-bold text-lg">{wo.wo_number}</span>
                     {statusBadge(wo.status)}
+                    {wo.product_id && products.find(p => p.id === wo.product_id) && (
+                      <Badge variant="outline" className="text-xs">{products.find(p => p.id === wo.product_id)!.name}</Badge>
+                    )}
                   </div>
                   <span className="text-sm text-muted-foreground">{new Date(wo.created_at).toLocaleDateString()}</span>
                 </div>

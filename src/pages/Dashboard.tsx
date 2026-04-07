@@ -16,16 +16,24 @@ interface Stats {
   completedQuantity: number;
 }
 
+interface ProductStat {
+  name: string;
+  count: number;
+}
+
 const PIE_COLORS = ['hsl(215, 70%, 28%)', 'hsl(38, 92%, 50%)', 'hsl(142, 60%, 40%)'];
+const BAR_COLORS = ['hsl(174, 60%, 40%)', 'hsl(215, 70%, 50%)', 'hsl(38, 80%, 50%)', 'hsl(340, 60%, 50%)', 'hsl(142, 50%, 45%)'];
 
 export default function Dashboard() {
   const [stats, setStats] = useState<Stats>({ totalWO: 0, openWO: 0, inProgressWO: 0, completedWO: 0, totalSteps: 0, completedSteps: 0, totalQuantity: 0, completedQuantity: 0 });
   const [recentWOs, setRecentWOs] = useState<any[]>([]);
+  const [productStats, setProductStats] = useState<ProductStat[]>([]);
 
   useEffect(() => {
     const fetchData = async () => {
       const { data: workOrders } = await supabase.from('work_orders').select('*');
       const { data: steps } = await supabase.from('process_steps').select('*');
+      const { data: products } = await supabase.from('products').select('id, name');
 
       if (workOrders) {
         const open = workOrders.filter(w => w.status === 'open').length;
@@ -48,6 +56,17 @@ export default function Dashboard() {
         });
 
         setRecentWOs(workOrders.slice(-5).reverse());
+
+        // Product stats
+        if (products) {
+          const productMap = new Map(products.map(p => [p.id, p.name]));
+          const counts: Record<string, number> = {};
+          workOrders.forEach(wo => {
+            const pName = wo.product_id ? (productMap.get(wo.product_id) || 'Unknown') : 'Unassigned';
+            counts[pName] = (counts[pName] || 0) + 1;
+          });
+          setProductStats(Object.entries(counts).map(([name, count]) => ({ name, count })));
+        }
       }
     };
     fetchData();
@@ -143,6 +162,31 @@ export default function Dashboard() {
           </CardContent>
         </Card>
       </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-lg">Work Orders by Product</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {productStats.length > 0 ? (
+            <ResponsiveContainer width="100%" height={250}>
+              <BarChart data={productStats}>
+                <CartesianGrid strokeDasharray="3 3" className="opacity-30" />
+                <XAxis dataKey="name" />
+                <YAxis allowDecimals={false} />
+                <Tooltip />
+                <Bar dataKey="count" name="Work Orders" radius={[4, 4, 0, 0]}>
+                  {productStats.map((_, i) => (
+                    <Cell key={i} fill={BAR_COLORS[i % BAR_COLORS.length]} />
+                  ))}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          ) : (
+            <div className="flex items-center justify-center h-[250px] text-muted-foreground">No product data yet</div>
+          )}
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader>

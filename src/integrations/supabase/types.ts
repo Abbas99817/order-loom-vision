@@ -61,6 +61,30 @@ export type Database = {
           },
         ]
       }
+      products: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          description: string
+          id: string
+          name: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          description?: string
+          id?: string
+          name: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          description?: string
+          id?: string
+          name?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           created_at: string
@@ -147,6 +171,7 @@ export type Database = {
           created_by: string | null
           description: string
           id: string
+          product_id: string | null
           status: string
           total_quantity: number
           updated_at: string
@@ -157,6 +182,7 @@ export type Database = {
           created_by?: string | null
           description?: string
           id?: string
+          product_id?: string | null
           status?: string
           total_quantity?: number
           updated_at?: string
@@ -167,12 +193,21 @@ export type Database = {
           created_by?: string | null
           description?: string
           id?: string
+          product_id?: string | null
           status?: string
           total_quantity?: number
           updated_at?: string
           wo_number?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "work_orders_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+        ]
       }
     }
     Views: {
