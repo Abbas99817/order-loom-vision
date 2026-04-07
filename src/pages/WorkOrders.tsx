@@ -42,12 +42,15 @@ interface StepSummary {
 export default function WorkOrders() {
   const [workOrders, setWorkOrders] = useState<WorkOrder[]>([]);
   const [stepSummaries, setStepSummaries] = useState<StepSummary[]>([]);
+  const [products, setProducts] = useState<Product[]>([]);
   const [search, setSearch] = useState('');
   const [dialogOpen, setDialogOpen] = useState(false);
   const [woNumber, setWoNumber] = useState('');
   const [description, setDescription] = useState('');
   const [totalQuantity, setTotalQuantity] = useState('');
+  const [selectedProductId, setSelectedProductId] = useState('');
   const { user, hasRole } = useAuth();
+  const { toast } = useToast();
   const { toast } = useToast();
   const navigate = useNavigate();
 
