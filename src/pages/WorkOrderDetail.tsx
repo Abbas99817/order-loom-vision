@@ -205,7 +205,7 @@ export default function WorkOrderDetail() {
       return;
     }
 
-    const updates: Record<string, any> = { assigned_quantity: newQty };
+    const updates: { assigned_quantity: number; assigned_to?: string; status?: string } = { assigned_quantity: newQty };
     if (editStepAssignee) updates.assigned_to = editStepAssignee;
     if (newQty <= step.completed_quantity) updates.status = 'completed';
 
