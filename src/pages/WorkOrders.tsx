@@ -149,6 +149,19 @@ export default function WorkOrders() {
                   <Textarea value={description} onChange={e => setDescription(e.target.value)} placeholder="Describe the work order..." />
                 </div>
                 <div className="space-y-2">
+                  <Label>Product</Label>
+                  <Select value={selectedProductId} onValueChange={setSelectedProductId}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select a product" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {products.map(p => (
+                        <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
                   <Label>Total Quantity</Label>
                   <Input type="number" value={totalQuantity} onChange={e => setTotalQuantity(e.target.value)} placeholder="100" min="1" required />
                 </div>
