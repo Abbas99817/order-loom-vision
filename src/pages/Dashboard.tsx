@@ -165,6 +165,31 @@ export default function Dashboard() {
 
       <Card>
         <CardHeader>
+          <CardTitle className="text-lg">Work Orders by Product</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {productStats.length > 0 ? (
+            <ResponsiveContainer width="100%" height={250}>
+              <BarChart data={productStats}>
+                <CartesianGrid strokeDasharray="3 3" className="opacity-30" />
+                <XAxis dataKey="name" />
+                <YAxis allowDecimals={false} />
+                <Tooltip />
+                <Bar dataKey="count" name="Work Orders" radius={[4, 4, 0, 0]}>
+                  {productStats.map((_, i) => (
+                    <Cell key={i} fill={BAR_COLORS[i % BAR_COLORS.length]} />
+                  ))}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          ) : (
+            <div className="flex items-center justify-center h-[250px] text-muted-foreground">No product data yet</div>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
           <CardTitle className="text-lg">Recent Work Orders</CardTitle>
         </CardHeader>
         <CardContent>
