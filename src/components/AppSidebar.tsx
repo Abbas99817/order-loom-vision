@@ -1,6 +1,6 @@
 import { useAuth } from '@/hooks/useAuth';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { LayoutDashboard, ClipboardList, Settings, LogOut, Factory, Users, ListChecks } from 'lucide-react';
+import { LayoutDashboard, ClipboardList, Settings, LogOut, Factory, Users, ListChecks, Package } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
 
