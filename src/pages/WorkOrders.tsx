@@ -102,6 +102,7 @@ export default function WorkOrders() {
       setWoNumber('');
       setDescription('');
       setTotalQuantity('');
+      setSelectedProductId('');
       fetchData();
     }
   };
