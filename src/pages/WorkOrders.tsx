@@ -51,7 +51,6 @@ export default function WorkOrders() {
   const [selectedProductId, setSelectedProductId] = useState('');
   const { user, hasRole } = useAuth();
   const { toast } = useToast();
-  const { toast } = useToast();
   const navigate = useNavigate();
 
   const fetchData = async () => {
