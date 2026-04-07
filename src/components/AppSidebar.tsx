@@ -7,6 +7,7 @@ import { Badge } from '@/components/ui/badge';
 const navItems = [
   { label: 'Dashboard', icon: LayoutDashboard, path: '/', roles: ['admin', 'supervisor'] as const },
   { label: 'Work Orders', icon: ClipboardList, path: '/work-orders', roles: ['admin', 'supervisor'] as const },
+  { label: 'Products', icon: Package, path: '/products', roles: ['admin', 'supervisor'] as const },
   { label: 'My Tasks', icon: ListChecks, path: '/my-tasks', roles: ['employee', 'supervisor'] as const },
   { label: 'Users', icon: Users, path: '/users', roles: ['admin'] as const },
 ];

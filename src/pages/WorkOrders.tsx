@@ -187,6 +187,9 @@ export default function WorkOrders() {
                   <div className="flex items-center gap-3">
                     <span className="font-bold text-lg">{wo.wo_number}</span>
                     {statusBadge(wo.status)}
+                    {wo.product_id && products.find(p => p.id === wo.product_id) && (
+                      <Badge variant="outline" className="text-xs">{products.find(p => p.id === wo.product_id)!.name}</Badge>
+                    )}
                   </div>
                   <span className="text-sm text-muted-foreground">{new Date(wo.created_at).toLocaleDateString()}</span>
                 </div>
