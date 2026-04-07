@@ -91,6 +91,7 @@ export default function WorkOrders() {
       description,
       total_quantity: qty,
       created_by: user?.id,
+      product_id: selectedProductId || null,
     });
 
     if (error) {
