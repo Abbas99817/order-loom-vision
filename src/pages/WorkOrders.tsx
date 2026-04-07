@@ -74,7 +74,12 @@ export default function WorkOrders() {
     }
   };
 
-  useEffect(() => { fetchData(); }, []);
+  const fetchProducts = async () => {
+    const { data } = await supabase.from('products').select('id, name').order('name');
+    if (data) setProducts(data);
+  };
+
+  useEffect(() => { fetchData(); fetchProducts(); }, []);
 
   const createWorkOrder = async (e: React.FormEvent) => {
     e.preventDefault();
