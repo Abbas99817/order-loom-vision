@@ -7,7 +7,10 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell, Legend,
 } from 'recharts';
-import { ClipboardList, CheckCircle2, Clock, TrendingUp } from 'lucide-react';
+import { ClipboardList, CheckCircle2, Clock, TrendingUp, Download } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { exportToCSV, exportToPDF } from '@/lib/exportUtils';
 
 interface Stats {
   totalWO: number;
