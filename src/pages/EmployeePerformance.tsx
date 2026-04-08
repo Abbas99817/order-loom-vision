@@ -7,7 +7,10 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell, Legend, RadialBarChart, RadialBar,
 } from 'recharts';
-import { Users, TrendingUp, Award, Target } from 'lucide-react';
+import { Users, TrendingUp, Award, Target, Download } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { exportToCSV, exportToPDF } from '@/lib/exportUtils';
 
 interface EmployeeStat {
   name: string;
