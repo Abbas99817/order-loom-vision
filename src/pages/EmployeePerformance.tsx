@@ -106,11 +106,37 @@ export default function EmployeePerformance() {
     );
   }
 
+  const exportEmployees = (format: 'csv' | 'pdf') => {
+    const headers = ['Employee', 'Assigned Steps', 'Assigned Units', 'Completed Units', 'Pending Units', 'Completion Rate', 'Active WOs'];
+    const rows = employees.map(e => [e.name, e.assignedSteps, e.assignedUnits, e.completedUnits, e.assignedUnits - e.completedUnits, `${e.completionRate}%`, e.activeWOs]);
+    const summary = [
+      { label: 'Total Employees', value: employees.length },
+      { label: 'Total Assigned', value: totalAssigned },
+      { label: 'Total Completed', value: totalCompleted },
+      { label: 'Avg Completion Rate', value: `${avgRate}%` },
+    ];
+    if (format === 'csv') exportToCSV('employee-performance', headers, rows);
+    else exportToPDF('employee-performance', 'Employee Performance Report', headers, rows, summary);
+  };
+
   return (
     <div className="p-6 space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-foreground">Employee Performance</h1>
-        <p className="text-muted-foreground">Detailed productivity and contribution analytics</p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-foreground">Employee Performance</h1>
+          <p className="text-muted-foreground">Detailed productivity and contribution analytics</p>
+        </div>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="outline" size="sm" className="gap-2">
+              <Download className="h-4 w-4" /> Export
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent>
+            <DropdownMenuItem onClick={() => exportEmployees('csv')}>Export as CSV</DropdownMenuItem>
+            <DropdownMenuItem onClick={() => exportEmployees('pdf')}>Export as PDF</DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
 
       {/* Summary Cards */}

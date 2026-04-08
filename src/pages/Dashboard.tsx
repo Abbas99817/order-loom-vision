@@ -119,11 +119,38 @@ export default function Dashboard() {
     }
   };
 
+  const exportDashboard = (format: 'csv' | 'pdf') => {
+    const headers = ['Product', 'Total WOs', 'Open', 'In Progress', 'Completed'];
+    const rows = productStats.map(p => [p.name, p.total, p.open, p.inProgress, p.completed]);
+    const summary = [
+      { label: 'Total Work Orders', value: stats.totalWO },
+      { label: 'Open', value: stats.openWO },
+      { label: 'In Progress', value: stats.inProgressWO },
+      { label: 'Completed', value: stats.completedWO },
+      { label: 'Production Rate', value: stats.totalQuantity > 0 ? `${Math.round((stats.completedQuantity / stats.totalQuantity) * 100)}%` : '0%' },
+    ];
+    if (format === 'csv') exportToCSV('dashboard-report', headers, rows);
+    else exportToPDF('dashboard-report', 'Dashboard Report', headers, rows, summary);
+  };
+
   return (
     <div className="p-6 space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-foreground">Dashboard</h1>
-        <p className="text-muted-foreground">Production overview and analytics</p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-foreground">Dashboard</h1>
+          <p className="text-muted-foreground">Production overview and analytics</p>
+        </div>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="outline" size="sm" className="gap-2">
+              <Download className="h-4 w-4" /> Export
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent>
+            <DropdownMenuItem onClick={() => exportDashboard('csv')}>Export as CSV</DropdownMenuItem>
+            <DropdownMenuItem onClick={() => exportDashboard('pdf')}>Export as PDF</DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
 
       {/* Stat Cards */}
