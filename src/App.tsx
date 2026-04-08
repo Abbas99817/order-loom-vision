@@ -12,6 +12,8 @@ import WorkOrderDetail from "./pages/WorkOrderDetail";
 import MyTasks from "./pages/MyTasks";
 import UsersManagement from "./pages/UsersManagement";
 import Products from "./pages/Products";
+import ProductDetail from "./pages/ProductDetail";
+import EmployeePerformance from "./pages/EmployeePerformance";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -39,6 +41,8 @@ function ProtectedRoutes() {
         <Route path="/work-orders" element={<WorkOrders />} />
         <Route path="/work-orders/:id" element={<WorkOrderDetail />} />
         <Route path="/products" element={<Products />} />
+        <Route path="/products/:id" element={<ProductDetail />} />
+        <Route path="/employee-performance" element={<EmployeePerformance />} />
         <Route path="/my-tasks" element={<MyTasks />} />
         <Route path="/users" element={<UsersManagement />} />
         <Route path="*" element={<NotFound />} />
