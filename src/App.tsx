@@ -12,6 +12,8 @@ import WorkOrderDetail from "./pages/WorkOrderDetail";
 import MyTasks from "./pages/MyTasks";
 import UsersManagement from "./pages/UsersManagement";
 import Products from "./pages/Products";
+import ProductDetail from "./pages/ProductDetail";
+import EmployeePerformance from "./pages/EmployeePerformance";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
