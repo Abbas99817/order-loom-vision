@@ -41,6 +41,8 @@ function ProtectedRoutes() {
         <Route path="/work-orders" element={<WorkOrders />} />
         <Route path="/work-orders/:id" element={<WorkOrderDetail />} />
         <Route path="/products" element={<Products />} />
+        <Route path="/products/:id" element={<ProductDetail />} />
+        <Route path="/employee-performance" element={<EmployeePerformance />} />
         <Route path="/my-tasks" element={<MyTasks />} />
         <Route path="/users" element={<UsersManagement />} />
         <Route path="*" element={<NotFound />} />
