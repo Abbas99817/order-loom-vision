@@ -7,7 +7,7 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell, Legend,
 } from 'recharts';
-import { ClipboardList, CheckCircle2, Clock, TrendingUp, Download } from 'lucide-react';
+import { ClipboardList, CheckCircle2, Clock, TrendingUp, Download, Activity } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { exportToCSV, exportToPDF } from '@/lib/exportUtils';
@@ -30,6 +30,15 @@ interface ProductStat {
   completed: number;
 }
 
+interface RecentActivity {
+  id: string;
+  type: 'progress' | 'wo_created' | 'step_added';
+  description: string;
+  user: string;
+  timestamp: string;
+  meta?: string;
+}
+
 const PIE_COLORS = ['hsl(215, 70%, 50%)', 'hsl(38, 92%, 50%)', 'hsl(142, 60%, 40%)'];
 
 const CustomTooltip = ({ active, payload, label }: any) => {
@@ -48,27 +57,32 @@ const CustomTooltip = ({ active, payload, label }: any) => {
   );
 };
 
-function cn(...classes: (string | undefined)[]) {
-  return classes.filter(Boolean).join(' ');
-}
-
 export default function Dashboard() {
   const navigate = useNavigate();
   const [stats, setStats] = useState<Stats>({ totalWO: 0, openWO: 0, inProgressWO: 0, completedWO: 0, totalQuantity: 0, completedQuantity: 0 });
   const [recentWOs, setRecentWOs] = useState<any[]>([]);
   const [productStats, setProductStats] = useState<ProductStat[]>([]);
+  const [recentActivity, setRecentActivity] = useState<RecentActivity[]>([]);
 
   useEffect(() => {
     const fetchData = async () => {
-      const [woRes, stepsRes, productsRes] = await Promise.all([
+      const [woRes, stepsRes, productsRes, logsRes, profilesRes] = await Promise.all([
         supabase.from('work_orders').select('*'),
         supabase.from('process_steps').select('*'),
         supabase.from('products').select('id, name'),
+        supabase.from('progress_logs').select('*').order('created_at', { ascending: false }).limit(20),
+        supabase.from('profiles').select('user_id, full_name'),
       ]);
 
       const workOrders = woRes.data || [];
       const steps = stepsRes.data || [];
       const products = productsRes.data || [];
+      const logs = logsRes.data || [];
+      const profiles = profilesRes.data || [];
+
+      const profileMap = new Map(profiles.map(p => [p.user_id, p.full_name]));
+      const stepMap = new Map(steps.map(s => [s.id, s]));
+      const woMap = new Map(workOrders.map(w => [w.id, w]));
 
       const open = workOrders.filter(w => w.status === 'open').length;
       const inProg = workOrders.filter(w => w.status === 'in_progress').length;
@@ -79,6 +93,7 @@ export default function Dashboard() {
       setStats({ totalWO: workOrders.length, openWO: open, inProgressWO: inProg, completedWO: completed, totalQuantity: totalQty, completedQuantity: completedQty });
       setRecentWOs(workOrders.slice(-5).reverse());
 
+      // Product stats
       const productMap = new Map(products.map(p => [p.id, p.name]));
       const pStats: Record<string, ProductStat> = {};
       workOrders.forEach(wo => {
@@ -91,6 +106,21 @@ export default function Dashboard() {
         else if (wo.status === 'completed') pStats[pId].completed++;
       });
       setProductStats(Object.values(pStats).sort((a, b) => b.total - a.total));
+
+      // Recent activity from progress logs
+      const activities: RecentActivity[] = logs.map(log => {
+        const step = stepMap.get(log.process_step_id);
+        const wo = step ? woMap.get(step.work_order_id) : null;
+        return {
+          id: log.id,
+          type: 'progress' as const,
+          description: `Completed ${log.quantity_completed} units on "${step?.step_name || 'Unknown step'}"`,
+          user: profileMap.get(log.updated_by) || 'Unknown',
+          timestamp: log.created_at,
+          meta: wo?.wo_number || '',
+        };
+      });
+      setRecentActivity(activities.slice(0, 10));
     };
     fetchData();
   }, []);
@@ -133,6 +163,17 @@ export default function Dashboard() {
     else exportToPDF('dashboard-report', 'Dashboard Report', headers, rows, summary);
   };
 
+  const formatTimeAgo = (dateStr: string) => {
+    const diff = Date.now() - new Date(dateStr).getTime();
+    const mins = Math.floor(diff / 60000);
+    if (mins < 1) return 'Just now';
+    if (mins < 60) return `${mins}m ago`;
+    const hrs = Math.floor(mins / 60);
+    if (hrs < 24) return `${hrs}h ago`;
+    const days = Math.floor(hrs / 24);
+    return `${days}d ago`;
+  };
+
   return (
     <div className="p-6 space-y-6">
       <div className="flex items-center justify-between">
@@ -164,7 +205,7 @@ export default function Dashboard() {
                   <p className="text-2xl font-bold mt-1 text-foreground">{card.value}</p>
                 </div>
                 <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10">
-                  <card.icon className={cn('h-6 w-6', card.color)} />
+                  <card.icon className={`h-6 w-6 ${card.color}`} />
                 </div>
               </div>
             </CardContent>
@@ -252,36 +293,76 @@ export default function Dashboard() {
         </Card>
       </div>
 
-      {/* Recent Work Orders */}
-      <Card className="shadow-sm">
-        <CardHeader className="pb-2">
-          <CardTitle className="text-lg font-semibold">Recent Work Orders</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {recentWOs.length > 0 ? (
-            <div className="space-y-2">
-              {recentWOs.map(wo => (
-                <div
-                  key={wo.id}
-                  className="flex items-center justify-between p-3 rounded-lg bg-muted/50 hover:bg-muted/80 cursor-pointer transition-colors"
-                  onClick={() => navigate(`/work-orders/${wo.id}`)}
-                >
-                  <div>
-                    <span className="font-medium text-foreground">{wo.wo_number}</span>
-                    <span className="text-muted-foreground ml-2 text-sm">{wo.description}</span>
+      {/* Recent Activity + Recent Work Orders */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Recent Activity */}
+        <Card className="shadow-sm">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-lg font-semibold flex items-center gap-2">
+              <Activity className="h-5 w-5 text-primary" />
+              Recent Activity
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {recentActivity.length > 0 ? (
+              <div className="space-y-1">
+                {recentActivity.map(act => (
+                  <div key={act.id} className="flex items-start gap-3 p-2.5 rounded-lg hover:bg-muted/50 transition-colors">
+                    <div className="mt-1 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary/10">
+                      <div className="h-2 w-2 rounded-full bg-primary" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm text-foreground leading-snug">
+                        <span className="font-medium">{act.user}</span>{' '}
+                        <span className="text-muted-foreground">{act.description}</span>
+                      </p>
+                      <div className="flex items-center gap-2 mt-0.5">
+                        {act.meta && (
+                          <Badge variant="secondary" className="text-[10px] px-1.5 py-0">{act.meta}</Badge>
+                        )}
+                        <span className="text-[11px] text-muted-foreground">{formatTimeAgo(act.timestamp)}</span>
+                      </div>
+                    </div>
                   </div>
-                  <div className="flex items-center gap-3">
-                    <span className="text-sm text-muted-foreground">{wo.total_quantity} units</span>
-                    {statusBadge(wo.status)}
+                ))}
+              </div>
+            ) : (
+              <div className="flex items-center justify-center h-[200px] text-muted-foreground">No activity yet</div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Recent Work Orders */}
+        <Card className="shadow-sm">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-lg font-semibold">Recent Work Orders</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {recentWOs.length > 0 ? (
+              <div className="space-y-2">
+                {recentWOs.map(wo => (
+                  <div
+                    key={wo.id}
+                    className="flex items-center justify-between p-3 rounded-lg bg-muted/50 hover:bg-muted/80 cursor-pointer transition-colors"
+                    onClick={() => navigate(`/work-orders/${wo.id}`)}
+                  >
+                    <div className="min-w-0">
+                      <span className="font-medium text-foreground">{wo.wo_number}</span>
+                      <p className="text-muted-foreground text-sm truncate">{wo.description}</p>
+                    </div>
+                    <div className="flex items-center gap-3 shrink-0 ml-3">
+                      <span className="text-sm text-muted-foreground">{wo.total_quantity} units</span>
+                      {statusBadge(wo.status)}
+                    </div>
                   </div>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <p className="text-muted-foreground text-center py-8">No work orders yet. Create one to get started!</p>
-          )}
-        </CardContent>
-      </Card>
+                ))}
+              </div>
+            ) : (
+              <p className="text-muted-foreground text-center py-8">No work orders yet.</p>
+            )}
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 }
