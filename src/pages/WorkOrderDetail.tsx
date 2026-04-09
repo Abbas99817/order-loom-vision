@@ -63,6 +63,7 @@ export default function WorkOrderDetail() {
   const [updateDialogOpen, setUpdateDialogOpen] = useState<string | null>(null);
   const [updateQty, setUpdateQty] = useState('');
   const [updateNotes, setUpdateNotes] = useState('');
+  const [updateOnBehalf, setUpdateOnBehalf] = useState('');
   const [editStepId, setEditStepId] = useState<string | null>(null);
   const [editStepQuantity, setEditStepQuantity] = useState('');
   const [editStepAssignee, setEditStepAssignee] = useState('');
@@ -165,9 +166,10 @@ export default function WorkOrderDetail() {
       return;
     }
 
+    const doneBy = (canManageSteps && updateOnBehalf) ? updateOnBehalf : user.id;
     const { error } = await supabase.from('progress_logs').insert({
       process_step_id: stepId,
-      updated_by: user.id,
+      updated_by: doneBy,
       quantity_completed: qty,
       notes: updateNotes || null,
     });
@@ -185,6 +187,7 @@ export default function WorkOrderDetail() {
     setUpdateDialogOpen(null);
     setUpdateQty('');
     setUpdateNotes('');
+    setUpdateOnBehalf('');
     await fetchAll();
 
     // Check if ALL steps are now complete
@@ -360,6 +363,20 @@ export default function WorkOrderDetail() {
                             <div className="text-sm text-muted-foreground">
                               Completed: {step.completed_quantity} / {wo.total_quantity} · Remaining: {remaining} units
                             </div>
+                            {canManageSteps && (
+                              <div className="space-y-2">
+                                <Label>Done By (employee)</Label>
+                                <Select value={updateOnBehalf} onValueChange={setUpdateOnBehalf}>
+                                  <SelectTrigger><SelectValue placeholder="Myself" /></SelectTrigger>
+                                  <SelectContent>
+                                    {employees.map(emp => (
+                                      <SelectItem key={emp.user_id} value={emp.user_id}>{emp.full_name}</SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                                <p className="text-xs text-muted-foreground">Leave empty to record under your own name</p>
+                              </div>
+                            )}
                             <div className="space-y-2">
                               <Label>Completed Quantity</Label>
                               <Input type="number" value={updateQty} onChange={e => setUpdateQty(e.target.value)} min="1" max={remaining} required />
