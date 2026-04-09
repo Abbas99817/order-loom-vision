@@ -166,9 +166,10 @@ export default function WorkOrderDetail() {
       return;
     }
 
+    const doneBy = (canManageSteps && updateOnBehalf) ? updateOnBehalf : user.id;
     const { error } = await supabase.from('progress_logs').insert({
       process_step_id: stepId,
-      updated_by: user.id,
+      updated_by: doneBy,
       quantity_completed: qty,
       notes: updateNotes || null,
     });
