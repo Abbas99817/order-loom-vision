@@ -63,6 +63,7 @@ export default function WorkOrderDetail() {
   const [updateDialogOpen, setUpdateDialogOpen] = useState<string | null>(null);
   const [updateQty, setUpdateQty] = useState('');
   const [updateNotes, setUpdateNotes] = useState('');
+  const [updateOnBehalf, setUpdateOnBehalf] = useState('');
   const [editStepId, setEditStepId] = useState<string | null>(null);
   const [editStepQuantity, setEditStepQuantity] = useState('');
   const [editStepAssignee, setEditStepAssignee] = useState('');
