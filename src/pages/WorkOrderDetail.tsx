@@ -187,6 +187,7 @@ export default function WorkOrderDetail() {
     setUpdateDialogOpen(null);
     setUpdateQty('');
     setUpdateNotes('');
+    setUpdateOnBehalf('');
     await fetchAll();
 
     // Check if ALL steps are now complete
