@@ -11,7 +11,8 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
-import { Plus, Search } from 'lucide-react';
+import { Plus, Search, Trash2 } from 'lucide-react';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Progress } from '@/components/ui/progress';
 
 interface WorkOrder {
@@ -106,6 +107,23 @@ export default function WorkOrders() {
     }
   };
 
+  const deleteWorkOrder = async (woId: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    // Delete related process steps first, then work order
+    await supabase.from('progress_logs').delete().in(
+      'process_step_id',
+      (await supabase.from('process_steps').select('id').eq('work_order_id', woId)).data?.map(s => s.id) || []
+    );
+    await supabase.from('process_steps').delete().eq('work_order_id', woId);
+    const { error } = await supabase.from('work_orders').delete().eq('id', woId);
+    if (error) {
+      toast({ title: 'Error', description: error.message, variant: 'destructive' });
+    } else {
+      toast({ title: 'Deleted', description: 'Work order has been deleted.' });
+      fetchData();
+    }
+  };
+
   const getProgress = (woId: string) => {
     const woItem = workOrders.find(w => w.id === woId);
     const summary = stepSummaries.find(s => s.work_order_id === woId);
@@ -191,7 +209,28 @@ export default function WorkOrders() {
                       <Badge variant="outline" className="text-xs">{products.find(p => p.id === wo.product_id)!.name}</Badge>
                     )}
                   </div>
-                  <span className="text-sm text-muted-foreground">{new Date(wo.created_at).toLocaleDateString()}</span>
+                  <div className="flex items-center gap-3">
+                    <span className="text-sm text-muted-foreground">{new Date(wo.created_at).toLocaleDateString()}</span>
+                    {hasRole('admin') && (
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                          <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-destructive" onClick={e => e.stopPropagation()}>
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent onClick={e => e.stopPropagation()}>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>Delete Work Order?</AlertDialogTitle>
+                            <AlertDialogDescription>This will permanently delete {wo.wo_number} and all its steps and progress logs. This cannot be undone.</AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel>Cancel</AlertDialogCancel>
+                            <AlertDialogAction onClick={(e) => deleteWorkOrder(wo.id, e)} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">Delete</AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
+                    )}
+                  </div>
                 </div>
                 <p className="text-muted-foreground text-sm mb-3">{wo.description}</p>
                 <div className="flex items-center justify-between text-sm">
