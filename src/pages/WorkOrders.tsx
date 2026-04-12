@@ -148,7 +148,7 @@ export default function WorkOrders() {
           <h1 className="text-2xl font-bold text-foreground">Work Orders</h1>
           <p className="text-muted-foreground">Manage production work orders</p>
         </div>
-        {hasRole('admin') && (
+        {(hasRole('admin') || hasRole('supervisor')) && (
           <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
             <DialogTrigger asChild>
               <Button><Plus className="h-4 w-4 mr-2" />New Work Order</Button>
@@ -211,7 +211,7 @@ export default function WorkOrders() {
                   </div>
                   <div className="flex items-center gap-3">
                     <span className="text-sm text-muted-foreground">{new Date(wo.created_at).toLocaleDateString()}</span>
-                    {hasRole('admin') && (
+                    {(hasRole('admin') || hasRole('supervisor')) && (
                       <AlertDialog>
                         <AlertDialogTrigger asChild>
                           <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-destructive" onClick={e => e.stopPropagation()}>

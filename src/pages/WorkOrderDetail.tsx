@@ -70,6 +70,8 @@ export default function WorkOrderDetail() {
 
   const canManageSteps = hasRole('admin') || hasRole('supervisor');
 
+  const [myEmployeeIds, setMyEmployeeIds] = useState<string[]>([]);
+
   const fetchAll = async () => {
     if (!id) return;
     const { data: woData } = await supabase.from('work_orders').select('*').eq('id', id).single();
@@ -88,6 +90,15 @@ export default function WorkOrderDetail() {
 
     const { data: profilesData } = await supabase.from('profiles').select('user_id, full_name, role');
     if (profilesData) setProfiles(profilesData);
+
+    // Fetch supervisor's assigned employees
+    if (user && hasRole('supervisor') && !hasRole('admin')) {
+      const { data: seData } = await supabase
+        .from('supervisor_employees')
+        .select('employee_id')
+        .eq('supervisor_id', user.id);
+      if (seData) setMyEmployeeIds(seData.map(s => s.employee_id));
+    }
   };
 
   useEffect(() => { fetchAll(); }, [id]);
@@ -240,7 +251,15 @@ export default function WorkOrderDetail() {
 
   if (!wo) return <div className="p-6 text-muted-foreground">Loading...</div>;
 
-  const employees = profiles.filter(p => p.role === 'employee' || p.role === 'supervisor');
+  const employees = (() => {
+    const allEmployees = profiles.filter(p => p.role === 'employee' || p.role === 'supervisor');
+    // Supervisors only see their assigned employees; admins see all
+    if (hasRole('admin')) return allEmployees;
+    if (hasRole('supervisor') && myEmployeeIds.length > 0) {
+      return allEmployees.filter(p => myEmployeeIds.includes(p.user_id));
+    }
+    return allEmployees;
+  })();
 
   return (
     <div className="p-6 space-y-6">
