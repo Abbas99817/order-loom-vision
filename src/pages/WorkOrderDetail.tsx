@@ -251,7 +251,15 @@ export default function WorkOrderDetail() {
 
   if (!wo) return <div className="p-6 text-muted-foreground">Loading...</div>;
 
-  const employees = profiles.filter(p => p.role === 'employee' || p.role === 'supervisor');
+  const employees = (() => {
+    const allEmployees = profiles.filter(p => p.role === 'employee' || p.role === 'supervisor');
+    // Supervisors only see their assigned employees; admins see all
+    if (hasRole('admin')) return allEmployees;
+    if (hasRole('supervisor') && myEmployeeIds.length > 0) {
+      return allEmployees.filter(p => myEmployeeIds.includes(p.user_id));
+    }
+    return allEmployees;
+  })();
 
   return (
     <div className="p-6 space-y-6">
