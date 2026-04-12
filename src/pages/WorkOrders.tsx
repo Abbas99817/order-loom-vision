@@ -211,7 +211,7 @@ export default function WorkOrders() {
                   </div>
                   <div className="flex items-center gap-3">
                     <span className="text-sm text-muted-foreground">{new Date(wo.created_at).toLocaleDateString()}</span>
-                    {hasRole('admin') && (
+                    {(hasRole('admin') || hasRole('supervisor')) && (
                       <AlertDialog>
                         <AlertDialogTrigger asChild>
                           <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-destructive" onClick={e => e.stopPropagation()}>
