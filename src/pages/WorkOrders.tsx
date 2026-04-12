@@ -124,6 +124,7 @@ export default function WorkOrders() {
     }
   };
 
+  const getProgress = (woId: string) => {
     const woItem = workOrders.find(w => w.id === woId);
     const summary = stepSummaries.find(s => s.work_order_id === woId);
     if (!woItem || woItem.total_quantity === 0 || !summary) return 0;
