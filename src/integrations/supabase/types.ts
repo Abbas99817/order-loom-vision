@@ -147,6 +147,27 @@ export type Database = {
           },
         ]
       }
+      supervisor_employees: {
+        Row: {
+          created_at: string
+          employee_id: string
+          id: string
+          supervisor_id: string
+        }
+        Insert: {
+          created_at?: string
+          employee_id: string
+          id?: string
+          supervisor_id: string
+        }
+        Update: {
+          created_at?: string
+          employee_id?: string
+          id?: string
+          supervisor_id?: string
+        }
+        Relationships: []
+      }
       user_roles: {
         Row: {
           id: string
