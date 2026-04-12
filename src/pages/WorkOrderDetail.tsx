@@ -70,6 +70,8 @@ export default function WorkOrderDetail() {
 
   const canManageSteps = hasRole('admin') || hasRole('supervisor');
 
+  const [myEmployeeIds, setMyEmployeeIds] = useState<string[]>([]);
+
   const fetchAll = async () => {
     if (!id) return;
     const { data: woData } = await supabase.from('work_orders').select('*').eq('id', id).single();
@@ -88,6 +90,15 @@ export default function WorkOrderDetail() {
 
     const { data: profilesData } = await supabase.from('profiles').select('user_id, full_name, role');
     if (profilesData) setProfiles(profilesData);
+
+    // Fetch supervisor's assigned employees
+    if (user && hasRole('supervisor') && !hasRole('admin')) {
+      const { data: seData } = await supabase
+        .from('supervisor_employees')
+        .select('employee_id')
+        .eq('supervisor_id', user.id);
+      if (seData) setMyEmployeeIds(seData.map(s => s.employee_id));
+    }
   };
 
   useEffect(() => { fetchAll(); }, [id]);
