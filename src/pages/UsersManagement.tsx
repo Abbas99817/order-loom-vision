@@ -44,11 +44,21 @@ export default function UsersManagement() {
   useEffect(() => { fetchUsers(); fetchAssignments(); }, []);
 
   const updateRole = async (userId: string, newRole: 'admin' | 'supervisor' | 'employee') => {
+    // Update profile role
     const { error: profileError } = await supabase.from('profiles').update({ role: newRole }).eq('user_id', userId);
     if (profileError) {
       toast({ title: 'Error', description: profileError.message, variant: 'destructive' });
       return;
     }
+
+    // Update user_roles table (delete old roles, insert new one)
+    await supabase.from('user_roles').delete().eq('user_id', userId);
+    const { error: roleError } = await supabase.from('user_roles').insert({ user_id: userId, role: newRole });
+    if (roleError) {
+      toast({ title: 'Warning', description: 'Profile updated but role sync failed: ' + roleError.message, variant: 'destructive' });
+      return;
+    }
+
     toast({ title: 'Role Updated', description: `User role changed to ${newRole}` });
     fetchUsers();
   };
