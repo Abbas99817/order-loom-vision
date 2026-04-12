@@ -148,7 +148,7 @@ export default function WorkOrders() {
           <h1 className="text-2xl font-bold text-foreground">Work Orders</h1>
           <p className="text-muted-foreground">Manage production work orders</p>
         </div>
-        {hasRole('admin') && (
+        {(hasRole('admin') || hasRole('supervisor')) && (
           <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
             <DialogTrigger asChild>
               <Button><Plus className="h-4 w-4 mr-2" />New Work Order</Button>
