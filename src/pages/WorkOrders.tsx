@@ -107,7 +107,23 @@ export default function WorkOrders() {
     }
   };
 
-  const getProgress = (woId: string) => {
+  const deleteWorkOrder = async (woId: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    // Delete related process steps first, then work order
+    await supabase.from('progress_logs').delete().in(
+      'process_step_id',
+      (await supabase.from('process_steps').select('id').eq('work_order_id', woId)).data?.map(s => s.id) || []
+    );
+    await supabase.from('process_steps').delete().eq('work_order_id', woId);
+    const { error } = await supabase.from('work_orders').delete().eq('id', woId);
+    if (error) {
+      toast({ title: 'Error', description: error.message, variant: 'destructive' });
+    } else {
+      toast({ title: 'Deleted', description: 'Work order has been deleted.' });
+      fetchData();
+    }
+  };
+
     const woItem = workOrders.find(w => w.id === woId);
     const summary = stepSummaries.find(s => s.work_order_id === woId);
     if (!woItem || woItem.total_quantity === 0 || !summary) return 0;
