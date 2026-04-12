@@ -209,7 +209,28 @@ export default function WorkOrders() {
                       <Badge variant="outline" className="text-xs">{products.find(p => p.id === wo.product_id)!.name}</Badge>
                     )}
                   </div>
-                  <span className="text-sm text-muted-foreground">{new Date(wo.created_at).toLocaleDateString()}</span>
+                  <div className="flex items-center gap-3">
+                    <span className="text-sm text-muted-foreground">{new Date(wo.created_at).toLocaleDateString()}</span>
+                    {hasRole('admin') && (
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                          <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-destructive" onClick={e => e.stopPropagation()}>
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent onClick={e => e.stopPropagation()}>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>Delete Work Order?</AlertDialogTitle>
+                            <AlertDialogDescription>This will permanently delete {wo.wo_number} and all its steps and progress logs. This cannot be undone.</AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel>Cancel</AlertDialogCancel>
+                            <AlertDialogAction onClick={(e) => deleteWorkOrder(wo.id, e)} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">Delete</AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
+                    )}
+                  </div>
                 </div>
                 <p className="text-muted-foreground text-sm mb-3">{wo.description}</p>
                 <div className="flex items-center justify-between text-sm">
