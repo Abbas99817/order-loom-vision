@@ -481,10 +481,24 @@ export default function WorkOrderDetail() {
                 {stepLogs.length > 0 && (
                   <div className="mt-3 space-y-1.5 border-t pt-3">
                     <p className="text-xs font-medium text-muted-foreground">History</p>
-                    {stepLogs.slice(0, 3).map(log => (
-                      <div key={log.id} className="flex items-center justify-between text-xs text-muted-foreground">
-                        <span>{getProfileName(log.updated_by)} — {log.quantity_completed} units{log.notes ? ` (${log.notes})` : ''}</span>
-                        <span>{new Date(log.created_at).toLocaleString()}</span>
+                    {stepLogs.slice(0, 5).map(log => (
+                      <div key={log.id} className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
+                        <span className="flex-1 min-w-0">{getProfileName(log.updated_by)} — {log.quantity_completed} units{log.notes ? ` (${log.notes})` : ''}</span>
+                        <div className="flex items-center gap-1">
+                          <span>{new Date(log.created_at).toLocaleString()}</span>
+                          {canManageSteps && (
+                            <>
+                              <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => openEditLog(log)}>
+                                <Pencil className="h-3 w-3" />
+                              </Button>
+                              {hasRole('admin') || hasRole('supervisor') ? (
+                                <Button size="icon" variant="ghost" className="h-6 w-6 text-destructive" onClick={() => deleteLog(log.id, step.id)}>
+                                  <Trash2 className="h-3 w-3" />
+                                </Button>
+                              ) : null}
+                            </>
+                          )}
+                        </div>
                       </div>
                     ))}
                   </div>
