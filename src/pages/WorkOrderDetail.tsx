@@ -67,6 +67,9 @@ export default function WorkOrderDetail() {
   const [editStepId, setEditStepId] = useState<string | null>(null);
   const [editStepQuantity, setEditStepQuantity] = useState('');
   const [editStepAssignee, setEditStepAssignee] = useState('');
+  const [editLogId, setEditLogId] = useState<string | null>(null);
+  const [editLogQty, setEditLogQty] = useState('');
+  const [editLogNotes, setEditLogNotes] = useState('');
 
   const canManageSteps = hasRole('admin') || hasRole('supervisor');
 
