@@ -1,11 +1,11 @@
-import { ReactNode, useState } from 'react';
+import { ReactNode } from 'react';
 import AppSidebar from './AppSidebar';
-import { Button } from '@/components/ui/button';
-import { Menu, X, Factory } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import MobileBottomNav from './MobileBottomNav';
+import { Factory } from 'lucide-react';
+import { useAuth } from '@/hooks/useAuth';
 
 export default function AppLayout({ children }: { children: ReactNode }) {
-  const [mobileOpen, setMobileOpen] = useState(false);
+  const { profile } = useAuth();
 
   return (
     <div className="flex h-screen overflow-hidden">
@@ -14,36 +14,25 @@ export default function AppLayout({ children }: { children: ReactNode }) {
         <AppSidebar />
       </div>
 
-      {/* Mobile sidebar overlay */}
-      {mobileOpen && (
-        <div
-          className="fixed inset-0 z-40 bg-black/50 md:hidden"
-          onClick={() => setMobileOpen(false)}
-        />
-      )}
-      <div className={cn(
-        'fixed inset-y-0 left-0 z-50 transform transition-transform md:hidden',
-        mobileOpen ? 'translate-x-0' : '-translate-x-full'
-      )}>
-        <AppSidebar onNavigate={() => setMobileOpen(false)} />
-      </div>
-
       <div className="flex flex-1 flex-col overflow-hidden">
         {/* Mobile top bar */}
-        <header className="flex items-center justify-between border-b bg-background px-4 py-2 md:hidden">
+        <header className="flex items-center justify-between border-b bg-background px-4 h-14 md:hidden pt-[env(safe-area-inset-top)]">
           <div className="flex items-center gap-2">
             <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-sidebar-primary">
               <Factory className="h-4 w-4 text-sidebar-primary-foreground" />
             </div>
             <span className="text-sm font-bold">Production Mgr</span>
           </div>
-          <Button variant="ghost" size="icon" onClick={() => setMobileOpen(!mobileOpen)}>
-            {mobileOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
-          </Button>
+          {profile && (
+            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-sidebar-accent text-xs font-bold text-sidebar-accent-foreground">
+              {profile.full_name?.charAt(0)?.toUpperCase() || '?'}
+            </div>
+          )}
         </header>
-        <main className="flex-1 overflow-auto bg-background">
+        <main className="flex-1 overflow-auto bg-background overscroll-contain">
           {children}
         </main>
+        <MobileBottomNav />
       </div>
     </div>
   );

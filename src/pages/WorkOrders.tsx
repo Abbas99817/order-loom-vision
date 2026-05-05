@@ -142,18 +142,18 @@ export default function WorkOrders() {
   );
 
   return (
-    <div className="p-6 space-y-6">
-      <div className="flex items-center justify-between">
+    <div className="p-4 sm:p-6 space-y-4 sm:space-y-6 pb-24 md:pb-6">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-foreground">Work Orders</h1>
-          <p className="text-muted-foreground">Manage production work orders</p>
+          <h1 className="text-xl sm:text-2xl font-bold text-foreground">Work Orders</h1>
+          <p className="text-sm text-muted-foreground">Manage production work orders</p>
         </div>
         {(hasRole('admin') || hasRole('supervisor')) && (
           <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
             <DialogTrigger asChild>
-              <Button><Plus className="h-4 w-4 mr-2" />New Work Order</Button>
+              <Button className="w-full sm:w-auto"><Plus className="h-4 w-4 mr-2" />New Work Order</Button>
             </DialogTrigger>
-            <DialogContent>
+            <DialogContent className="max-w-[95vw] sm:max-w-lg">
               <DialogHeader>
                 <DialogTitle>Create Work Order</DialogTitle>
               </DialogHeader>
@@ -190,52 +190,49 @@ export default function WorkOrders() {
         )}
       </div>
 
-      <div className="relative max-w-sm">
+      <div className="relative w-full sm:max-w-sm">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
         <Input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search work orders..." className="pl-9" />
       </div>
 
-      <div className="grid gap-4">
+      <div className="grid gap-3 sm:gap-4">
         {filtered.map(wo => {
           const progress = getProgress(wo.id);
           return (
-            <Card key={wo.id} className="cursor-pointer hover:shadow-md transition-shadow" onClick={() => navigate(`/work-orders/${wo.id}`)}>
-              <CardContent className="p-5">
-                <div className="flex items-center justify-between mb-3">
-                  <div className="flex items-center gap-3">
-                    <span className="font-bold text-lg">{wo.wo_number}</span>
+            <Card key={wo.id} className="cursor-pointer hover:shadow-md active:scale-[0.99] transition-all" onClick={() => navigate(`/work-orders/${wo.id}`)}>
+              <CardContent className="p-4 sm:p-5">
+                <div className="flex items-start justify-between gap-2 mb-3">
+                  <div className="flex flex-wrap items-center gap-2 min-w-0 flex-1">
+                    <span className="font-bold text-base sm:text-lg break-all">{wo.wo_number}</span>
                     {statusBadge(wo.status)}
                     {wo.product_id && products.find(p => p.id === wo.product_id) && (
                       <Badge variant="outline" className="text-xs">{products.find(p => p.id === wo.product_id)!.name}</Badge>
                     )}
                   </div>
-                  <div className="flex items-center gap-3">
-                    <span className="text-sm text-muted-foreground">{new Date(wo.created_at).toLocaleDateString()}</span>
-                    {(hasRole('admin') || hasRole('supervisor')) && (
-                      <AlertDialog>
-                        <AlertDialogTrigger asChild>
-                          <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-destructive" onClick={e => e.stopPropagation()}>
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </AlertDialogTrigger>
-                        <AlertDialogContent onClick={e => e.stopPropagation()}>
-                          <AlertDialogHeader>
-                            <AlertDialogTitle>Delete Work Order?</AlertDialogTitle>
-                            <AlertDialogDescription>This will permanently delete {wo.wo_number} and all its steps and progress logs. This cannot be undone.</AlertDialogDescription>
-                          </AlertDialogHeader>
-                          <AlertDialogFooter>
-                            <AlertDialogCancel>Cancel</AlertDialogCancel>
-                            <AlertDialogAction onClick={(e) => deleteWorkOrder(wo.id, e)} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">Delete</AlertDialogAction>
-                          </AlertDialogFooter>
-                        </AlertDialogContent>
-                      </AlertDialog>
-                    )}
-                  </div>
+                  {(hasRole('admin') || hasRole('supervisor')) && (
+                    <AlertDialog>
+                      <AlertDialogTrigger asChild>
+                        <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0 text-muted-foreground hover:text-destructive" onClick={e => e.stopPropagation()}>
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent onClick={e => e.stopPropagation()} className="max-w-[95vw]">
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>Delete Work Order?</AlertDialogTitle>
+                          <AlertDialogDescription>This will permanently delete {wo.wo_number} and all its steps and progress logs. This cannot be undone.</AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel>Cancel</AlertDialogCancel>
+                          <AlertDialogAction onClick={(e) => deleteWorkOrder(wo.id, e)} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">Delete</AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
+                  )}
                 </div>
-                <p className="text-muted-foreground text-sm mb-3">{wo.description}</p>
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-muted-foreground">{wo.total_quantity} units</span>
-                  <span className="font-medium">{progress}% complete</span>
+                {wo.description && <p className="text-muted-foreground text-sm mb-3 line-clamp-2">{wo.description}</p>}
+                <div className="flex items-center justify-between text-xs sm:text-sm">
+                  <span className="text-muted-foreground">{wo.total_quantity} units · {new Date(wo.created_at).toLocaleDateString()}</span>
+                  <span className="font-medium">{progress}%</span>
                 </div>
                 <Progress value={progress} className="mt-2 h-2" />
               </CardContent>

@@ -116,7 +116,7 @@ export default function UsersManagement() {
     supervisorEmployees.filter(se => se.supervisor_id === supervisorId).length;
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-4 sm:p-6 space-y-4 sm:space-y-6 pb-24 md:pb-6">
       <div>
         <h1 className="text-2xl font-bold text-foreground">Users</h1>
         <p className="text-muted-foreground">Manage user roles and supervisor-employee assignments</p>
