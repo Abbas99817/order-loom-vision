@@ -299,6 +299,8 @@ export default function WorkOrderDetail() {
     toast({ title: 'Entry Deleted' });
     fetchAll();
   };
+
+  const getProfileName = (userId: string | null) => {
     if (!userId) return 'Unassigned';
     return profiles.find(p => p.user_id === userId)?.full_name || 'Unknown';
   };
