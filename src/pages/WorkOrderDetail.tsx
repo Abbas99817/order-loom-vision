@@ -543,6 +543,34 @@ export default function WorkOrderDetail() {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Edit Progress Log Dialog */}
+      <Dialog open={!!editLogId} onOpenChange={(open) => !open && setEditLogId(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit Progress Entry</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label>Completed Quantity</Label>
+              <Input type="number" value={editLogQty} onChange={e => setEditLogQty(e.target.value)} min="1" />
+            </div>
+            <div className="space-y-2">
+              <Label>Notes</Label>
+              <Textarea value={editLogNotes} onChange={e => setEditLogNotes(e.target.value)} />
+            </div>
+            <Button
+              onClick={() => {
+                const stepId = Object.keys(logs).find(sid => (logs[sid] || []).some(l => l.id === editLogId));
+                if (stepId) saveLogEdit(stepId);
+              }}
+              className="w-full"
+            >
+              Save Changes
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
