@@ -242,7 +242,63 @@ export default function WorkOrderDetail() {
     setEditStepAssignee(step.assigned_to || '');
   };
 
-  const getProfileName = (userId: string | null) => {
+  const recomputeStepCompleted = async (stepId: string) => {
+    if (!wo) return;
+    const { data } = await supabase
+      .from('progress_logs')
+      .select('quantity_completed')
+      .eq('process_step_id', stepId);
+    const total = (data || []).reduce((s, l) => s + (l.quantity_completed || 0), 0);
+    const newStatus = total >= wo.total_quantity ? 'completed' : total > 0 ? 'in_progress' : 'pending';
+    await supabase.from('process_steps').update({ completed_quantity: total, status: newStatus }).eq('id', stepId);
+  };
+
+  const openEditLog = (log: ProgressLog) => {
+    setEditLogId(log.id);
+    setEditLogQty(String(log.quantity_completed));
+    setEditLogNotes(log.notes || '');
+  };
+
+  const saveLogEdit = async (stepId: string) => {
+    if (!editLogId || !wo) return;
+    const qty = parseInt(editLogQty);
+    if (isNaN(qty) || qty < 1) {
+      toast({ title: 'Error', description: 'Quantity must be at least 1.', variant: 'destructive' });
+      return;
+    }
+    const stepLogs = logs[stepId] || [];
+    const otherTotal = stepLogs.filter(l => l.id !== editLogId).reduce((s, l) => s + l.quantity_completed, 0);
+    if (otherTotal + qty > wo.total_quantity) {
+      toast({ title: 'Error', description: `Total cannot exceed ${wo.total_quantity} units. Max for this entry: ${wo.total_quantity - otherTotal}.`, variant: 'destructive' });
+      return;
+    }
+    const { error } = await supabase
+      .from('progress_logs')
+      .update({ quantity_completed: qty, notes: editLogNotes || null })
+      .eq('id', editLogId);
+    if (error) {
+      toast({ title: 'Error', description: error.message, variant: 'destructive' });
+      return;
+    }
+    await recomputeStepCompleted(stepId);
+    toast({ title: 'Entry Updated' });
+    setEditLogId(null);
+    setEditLogQty('');
+    setEditLogNotes('');
+    fetchAll();
+  };
+
+  const deleteLog = async (logId: string, stepId: string) => {
+    if (!confirm('Delete this progress entry?')) return;
+    const { error } = await supabase.from('progress_logs').delete().eq('id', logId);
+    if (error) {
+      toast({ title: 'Error', description: error.message, variant: 'destructive' });
+      return;
+    }
+    await recomputeStepCompleted(stepId);
+    toast({ title: 'Entry Deleted' });
+    fetchAll();
+  };
     if (!userId) return 'Unassigned';
     return profiles.find(p => p.user_id === userId)?.full_name || 'Unknown';
   };
