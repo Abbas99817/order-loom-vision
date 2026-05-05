@@ -71,7 +71,7 @@ export default function AppSidebar({ onNavigate }: AppSidebarProps = {}) {
           const button = (
             <button
               key={item.path}
-              onClick={() => navigate(item.path)}
+              onClick={() => handleNav(item.path)}
               className={cn(
                 'flex w-full items-center rounded-lg text-sm font-medium transition-all duration-200',
                 collapsed ? 'justify-center p-2.5' : 'gap-3 px-3 py-2.5',
