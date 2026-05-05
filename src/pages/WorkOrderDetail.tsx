@@ -11,7 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Progress } from '@/components/ui/progress';
 import { useToast } from '@/hooks/use-toast';
-import { ArrowLeft, Plus, Save, Pencil } from 'lucide-react';
+import { ArrowLeft, Plus, Save, Pencil, Trash2 } from 'lucide-react';
 import { Textarea } from '@/components/ui/textarea';
 
 interface WorkOrder {
@@ -67,6 +67,9 @@ export default function WorkOrderDetail() {
   const [editStepId, setEditStepId] = useState<string | null>(null);
   const [editStepQuantity, setEditStepQuantity] = useState('');
   const [editStepAssignee, setEditStepAssignee] = useState('');
+  const [editLogId, setEditLogId] = useState<string | null>(null);
+  const [editLogQty, setEditLogQty] = useState('');
+  const [editLogNotes, setEditLogNotes] = useState('');
 
   const canManageSteps = hasRole('admin') || hasRole('supervisor');
 
@@ -237,6 +240,64 @@ export default function WorkOrderDetail() {
     setEditStepId(step.id);
     setEditStepQuantity(String(step.assigned_quantity));
     setEditStepAssignee(step.assigned_to || '');
+  };
+
+  const recomputeStepCompleted = async (stepId: string) => {
+    if (!wo) return;
+    const { data } = await supabase
+      .from('progress_logs')
+      .select('quantity_completed')
+      .eq('process_step_id', stepId);
+    const total = (data || []).reduce((s, l) => s + (l.quantity_completed || 0), 0);
+    const newStatus = total >= wo.total_quantity ? 'completed' : total > 0 ? 'in_progress' : 'pending';
+    await supabase.from('process_steps').update({ completed_quantity: total, status: newStatus }).eq('id', stepId);
+  };
+
+  const openEditLog = (log: ProgressLog) => {
+    setEditLogId(log.id);
+    setEditLogQty(String(log.quantity_completed));
+    setEditLogNotes(log.notes || '');
+  };
+
+  const saveLogEdit = async (stepId: string) => {
+    if (!editLogId || !wo) return;
+    const qty = parseInt(editLogQty);
+    if (isNaN(qty) || qty < 1) {
+      toast({ title: 'Error', description: 'Quantity must be at least 1.', variant: 'destructive' });
+      return;
+    }
+    const stepLogs = logs[stepId] || [];
+    const otherTotal = stepLogs.filter(l => l.id !== editLogId).reduce((s, l) => s + l.quantity_completed, 0);
+    if (otherTotal + qty > wo.total_quantity) {
+      toast({ title: 'Error', description: `Total cannot exceed ${wo.total_quantity} units. Max for this entry: ${wo.total_quantity - otherTotal}.`, variant: 'destructive' });
+      return;
+    }
+    const { error } = await supabase
+      .from('progress_logs')
+      .update({ quantity_completed: qty, notes: editLogNotes || null })
+      .eq('id', editLogId);
+    if (error) {
+      toast({ title: 'Error', description: error.message, variant: 'destructive' });
+      return;
+    }
+    await recomputeStepCompleted(stepId);
+    toast({ title: 'Entry Updated' });
+    setEditLogId(null);
+    setEditLogQty('');
+    setEditLogNotes('');
+    fetchAll();
+  };
+
+  const deleteLog = async (logId: string, stepId: string) => {
+    if (!confirm('Delete this progress entry?')) return;
+    const { error } = await supabase.from('progress_logs').delete().eq('id', logId);
+    if (error) {
+      toast({ title: 'Error', description: error.message, variant: 'destructive' });
+      return;
+    }
+    await recomputeStepCompleted(stepId);
+    toast({ title: 'Entry Deleted' });
+    fetchAll();
   };
 
   const getProfileName = (userId: string | null) => {
@@ -420,10 +481,24 @@ export default function WorkOrderDetail() {
                 {stepLogs.length > 0 && (
                   <div className="mt-3 space-y-1.5 border-t pt-3">
                     <p className="text-xs font-medium text-muted-foreground">History</p>
-                    {stepLogs.slice(0, 3).map(log => (
-                      <div key={log.id} className="flex items-center justify-between text-xs text-muted-foreground">
-                        <span>{getProfileName(log.updated_by)} — {log.quantity_completed} units{log.notes ? ` (${log.notes})` : ''}</span>
-                        <span>{new Date(log.created_at).toLocaleString()}</span>
+                    {stepLogs.slice(0, 5).map(log => (
+                      <div key={log.id} className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
+                        <span className="flex-1 min-w-0">{getProfileName(log.updated_by)} — {log.quantity_completed} units{log.notes ? ` (${log.notes})` : ''}</span>
+                        <div className="flex items-center gap-1">
+                          <span>{new Date(log.created_at).toLocaleString()}</span>
+                          {canManageSteps && (
+                            <>
+                              <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => openEditLog(log)}>
+                                <Pencil className="h-3 w-3" />
+                              </Button>
+                              {hasRole('admin') || hasRole('supervisor') ? (
+                                <Button size="icon" variant="ghost" className="h-6 w-6 text-destructive" onClick={() => deleteLog(log.id, step.id)}>
+                                  <Trash2 className="h-3 w-3" />
+                                </Button>
+                              ) : null}
+                            </>
+                          )}
+                        </div>
                       </div>
                     ))}
                   </div>
@@ -465,6 +540,34 @@ export default function WorkOrderDetail() {
               </Select>
             </div>
             <Button onClick={() => editStepId && saveStepEdit(editStepId)} className="w-full">Save Changes</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Progress Log Dialog */}
+      <Dialog open={!!editLogId} onOpenChange={(open) => !open && setEditLogId(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit Progress Entry</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label>Completed Quantity</Label>
+              <Input type="number" value={editLogQty} onChange={e => setEditLogQty(e.target.value)} min="1" />
+            </div>
+            <div className="space-y-2">
+              <Label>Notes</Label>
+              <Textarea value={editLogNotes} onChange={e => setEditLogNotes(e.target.value)} />
+            </div>
+            <Button
+              onClick={() => {
+                const stepId = Object.keys(logs).find(sid => (logs[sid] || []).some(l => l.id === editLogId));
+                if (stepId) saveLogEdit(stepId);
+              }}
+              className="w-full"
+            >
+              Save Changes
+            </Button>
           </div>
         </DialogContent>
       </Dialog>

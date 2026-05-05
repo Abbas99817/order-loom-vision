@@ -15,11 +15,20 @@ const navItems = [
   { label: 'Users', icon: Users, path: '/users', roles: ['admin'] as const },
 ];
 
-export default function AppSidebar() {
+interface AppSidebarProps {
+  onNavigate?: () => void;
+}
+
+export default function AppSidebar({ onNavigate }: AppSidebarProps = {}) {
   const { profile, signOut, hasRole } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const [collapsed, setCollapsed] = useState(false);
+
+  const handleNav = (path: string) => {
+    navigate(path);
+    onNavigate?.();
+  };
 
   const roleColor = {
     admin: 'destructive' as const,
@@ -62,7 +71,7 @@ export default function AppSidebar() {
           const button = (
             <button
               key={item.path}
-              onClick={() => navigate(item.path)}
+              onClick={() => handleNav(item.path)}
               className={cn(
                 'flex w-full items-center rounded-lg text-sm font-medium transition-all duration-200',
                 collapsed ? 'justify-center p-2.5' : 'gap-3 px-3 py-2.5',
