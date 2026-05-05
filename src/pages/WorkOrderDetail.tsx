@@ -323,7 +323,7 @@ export default function WorkOrderDetail() {
   })();
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-4 sm:p-6 space-y-4 sm:space-y-6 pb-24 md:pb-6">
       <div className="flex items-center gap-4">
         <Button variant="ghost" size="icon" onClick={() => navigate('/work-orders')}>
           <ArrowLeft className="h-5 w-5" />
