@@ -337,7 +337,7 @@ export default function WorkOrderDetail() {
         </Badge>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
         <Card className="stat-card">
           <CardContent className="p-4">
             <p className="text-sm text-muted-foreground">Total Quantity</p>
