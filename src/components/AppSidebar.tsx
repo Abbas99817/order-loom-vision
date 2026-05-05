@@ -15,11 +15,20 @@ const navItems = [
   { label: 'Users', icon: Users, path: '/users', roles: ['admin'] as const },
 ];
 
-export default function AppSidebar() {
+interface AppSidebarProps {
+  onNavigate?: () => void;
+}
+
+export default function AppSidebar({ onNavigate }: AppSidebarProps = {}) {
   const { profile, signOut, hasRole } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const [collapsed, setCollapsed] = useState(false);
+
+  const handleNav = (path: string) => {
+    navigate(path);
+    onNavigate?.();
+  };
 
   const roleColor = {
     admin: 'destructive' as const,
