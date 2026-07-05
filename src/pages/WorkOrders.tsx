@@ -2,14 +2,14 @@ import { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useNavigate } from 'react-router-dom';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
 import { Plus, Search, Trash2 } from 'lucide-react';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
@@ -23,63 +23,64 @@ interface WorkOrder {
   status: string;
   created_at: string;
   product_id: string | null;
+  client_id?: string | null;
+  service_type_id?: string | null;
 }
 
-interface Product {
-  id: string;
-  name: string;
-}
+interface Option { id: string; name: string; }
+interface StepSummary { work_order_id: string; completed_quantity: number; }
 
-interface StepSummary {
-  work_order_id: string;
-  completed_quantity: number;
-}
-
-interface StepSummary {
-  work_order_id: string;
-  completed_quantity: number;
-}
+const ADD_NEW = '__add_new__';
 
 export default function WorkOrders() {
   const [workOrders, setWorkOrders] = useState<WorkOrder[]>([]);
   const [stepSummaries, setStepSummaries] = useState<StepSummary[]>([]);
-  const [products, setProducts] = useState<Product[]>([]);
+  const [products, setProducts] = useState<Option[]>([]);
+  const [clients, setClients] = useState<Option[]>([]);
+  const [serviceTypes, setServiceTypes] = useState<Option[]>([]);
   const [search, setSearch] = useState('');
   const [dialogOpen, setDialogOpen] = useState(false);
   const [woNumber, setWoNumber] = useState('');
   const [description, setDescription] = useState('');
   const [totalQuantity, setTotalQuantity] = useState('');
   const [selectedProductId, setSelectedProductId] = useState('');
+  const [selectedClientId, setSelectedClientId] = useState('');
+  const [selectedServiceTypeId, setSelectedServiceTypeId] = useState('');
+  const [addOpen, setAddOpen] = useState<null | 'client' | 'service'>(null);
+  const [newOptionName, setNewOptionName] = useState('');
   const { user, hasRole } = useAuth();
   const { toast } = useToast();
   const navigate = useNavigate();
 
   const fetchData = async () => {
     const { data: wos } = await supabase.from('work_orders').select('*').order('created_at', { ascending: false });
-    if (wos) setWorkOrders(wos);
+    if (wos) setWorkOrders(wos as WorkOrder[]);
 
     const { data: steps } = await supabase.from('process_steps').select('work_order_id, completed_quantity');
     if (steps) {
-      // Group steps by WO - for sequential model, track min completion across steps
       const grouped: Record<string, number[]> = {};
       steps.forEach(s => {
         if (!grouped[s.work_order_id]) grouped[s.work_order_id] = [];
         grouped[s.work_order_id].push(s.completed_quantity);
       });
-      const summaries = Object.entries(grouped).map(([work_order_id, completions]) => ({
-        work_order_id,
-        completed_quantity: Math.min(...completions), // bottleneck (min across steps)
-      }));
-      setStepSummaries(summaries);
+      setStepSummaries(Object.entries(grouped).map(([work_order_id, completions]) => ({
+        work_order_id, completed_quantity: Math.min(...completions),
+      })));
     }
   };
 
-  const fetchProducts = async () => {
-    const { data } = await supabase.from('products').select('id, name').order('name');
-    if (data) setProducts(data);
+  const fetchLookups = async () => {
+    const [p, c, s] = await Promise.all([
+      supabase.from('products').select('id, name').order('name'),
+      supabase.from('clients').select('id, name').order('name'),
+      supabase.from('service_types').select('id, name').order('name'),
+    ]);
+    if (p.data) setProducts(p.data);
+    if (c.data) setClients(c.data);
+    if (s.data) setServiceTypes(s.data);
   };
 
-  useEffect(() => { fetchData(); fetchProducts(); }, []);
+  useEffect(() => { fetchData(); fetchLookups(); }, []);
 
   const createWorkOrder = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -92,24 +93,43 @@ export default function WorkOrders() {
       total_quantity: qty,
       created_by: user?.id,
       product_id: selectedProductId || null,
-    });
+      client_id: selectedClientId || null,
+      service_type_id: selectedServiceTypeId || null,
+    } as any);
 
     if (error) {
       toast({ title: 'Error', description: error.message, variant: 'destructive' });
     } else {
       toast({ title: 'Work Order Created', description: `${woNumber} has been created.` });
       setDialogOpen(false);
-      setWoNumber('');
-      setDescription('');
-      setTotalQuantity('');
-      setSelectedProductId('');
+      setWoNumber(''); setDescription(''); setTotalQuantity('');
+      setSelectedProductId(''); setSelectedClientId(''); setSelectedServiceTypeId('');
       fetchData();
     }
   };
 
+  const handleAddNew = async () => {
+    const name = newOptionName.trim();
+    if (!name || !addOpen) return;
+    const table = addOpen === 'client' ? 'clients' : 'service_types';
+    const { data, error } = await supabase.from(table).insert({ name, created_by: user?.id } as any).select().single();
+    if (error) {
+      toast({ title: 'Error', description: error.message, variant: 'destructive' });
+      return;
+    }
+    if (addOpen === 'client') {
+      setClients(prev => [...prev, data as Option].sort((a, b) => a.name.localeCompare(b.name)));
+      setSelectedClientId(data.id);
+    } else {
+      setServiceTypes(prev => [...prev, data as Option].sort((a, b) => a.name.localeCompare(b.name)));
+      setSelectedServiceTypeId(data.id);
+    }
+    setNewOptionName('');
+    setAddOpen(null);
+  };
+
   const deleteWorkOrder = async (woId: string, e: React.MouseEvent) => {
     e.stopPropagation();
-    // Delete related process steps first, then work order
     await supabase.from('progress_logs').delete().in(
       'process_step_id',
       (await supabase.from('process_steps').select('id').eq('work_order_id', woId)).data?.map(s => s.id) || []
@@ -166,16 +186,43 @@ export default function WorkOrders() {
                   <Label>Description</Label>
                   <Textarea value={description} onChange={e => setDescription(e.target.value)} placeholder="Describe the work order..." />
                 </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className="space-y-2">
+                    <Label>Client / Company</Label>
+                    <Select
+                      value={selectedClientId}
+                      onValueChange={(v) => v === ADD_NEW ? setAddOpen('client') : setSelectedClientId(v)}
+                    >
+                      <SelectTrigger><SelectValue placeholder="Select client" /></SelectTrigger>
+                      <SelectContent>
+                        {clients.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+                        <SelectItem value={ADD_NEW} className="text-primary font-medium">+ Add new client</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label>Service Type / Domain</Label>
+                    <Select
+                      value={selectedServiceTypeId}
+                      onValueChange={(v) => v === ADD_NEW ? setAddOpen('service') : setSelectedServiceTypeId(v)}
+                    >
+                      <SelectTrigger><SelectValue placeholder="Select service" /></SelectTrigger>
+                      <SelectContent>
+                        {serviceTypes.map(s => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}
+                        <SelectItem value={ADD_NEW} className="text-primary font-medium">+ Add new service type</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+
                 <div className="space-y-2">
                   <Label>Product</Label>
                   <Select value={selectedProductId} onValueChange={setSelectedProductId}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select a product" />
-                    </SelectTrigger>
+                    <SelectTrigger><SelectValue placeholder="Select a product" /></SelectTrigger>
                     <SelectContent>
-                      {products.map(p => (
-                        <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
-                      ))}
+                      {products.map(p => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}
                     </SelectContent>
                   </Select>
                 </div>
@@ -190,6 +237,29 @@ export default function WorkOrders() {
         )}
       </div>
 
+      {/* Add-new dialog for client / service type */}
+      <Dialog open={addOpen !== null} onOpenChange={(o) => { if (!o) { setAddOpen(null); setNewOptionName(''); } }}>
+        <DialogContent className="max-w-[95vw] sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Add new {addOpen === 'client' ? 'client / company' : 'service type / domain'}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-2">
+            <Label>Name</Label>
+            <Input
+              value={newOptionName}
+              onChange={e => setNewOptionName(e.target.value)}
+              placeholder={addOpen === 'client' ? 'Acme Corp' : 'Web Development'}
+              autoFocus
+              onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleAddNew(); } }}
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setAddOpen(null); setNewOptionName(''); }}>Cancel</Button>
+            <Button onClick={handleAddNew} disabled={!newOptionName.trim()}>Add</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <div className="relative w-full sm:max-w-sm">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
         <Input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search work orders..." className="pl-9" />
@@ -198,6 +268,8 @@ export default function WorkOrders() {
       <div className="grid gap-3 sm:gap-4">
         {filtered.map(wo => {
           const progress = getProgress(wo.id);
+          const client = wo.client_id ? clients.find(c => c.id === wo.client_id) : null;
+          const service = wo.service_type_id ? serviceTypes.find(s => s.id === wo.service_type_id) : null;
           return (
             <Card key={wo.id} className="cursor-pointer hover:shadow-md active:scale-[0.99] transition-all" onClick={() => navigate(`/work-orders/${wo.id}`)}>
               <CardContent className="p-4 sm:p-5">
@@ -208,6 +280,8 @@ export default function WorkOrders() {
                     {wo.product_id && products.find(p => p.id === wo.product_id) && (
                       <Badge variant="outline" className="text-xs">{products.find(p => p.id === wo.product_id)!.name}</Badge>
                     )}
+                    {client && <Badge variant="secondary" className="text-xs">{client.name}</Badge>}
+                    {service && <Badge variant="secondary" className="text-xs">{service.name}</Badge>}
                   </div>
                   {(hasRole('admin') || hasRole('supervisor')) && (
                     <AlertDialog>

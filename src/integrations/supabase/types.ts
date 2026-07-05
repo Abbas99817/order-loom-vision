@@ -14,6 +14,30 @@ export type Database = {
   }
   public: {
     Tables: {
+      clients: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          id: string
+          name: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          name: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          name?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       process_steps: {
         Row: {
           assigned_quantity: number
@@ -147,6 +171,30 @@ export type Database = {
           },
         ]
       }
+      service_types: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          id: string
+          name: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          name: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          name?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       supervisor_employees: {
         Row: {
           created_at: string
@@ -188,33 +236,39 @@ export type Database = {
       }
       work_orders: {
         Row: {
+          client_id: string | null
           created_at: string
           created_by: string | null
           description: string
           id: string
           product_id: string | null
+          service_type_id: string | null
           status: string
           total_quantity: number
           updated_at: string
           wo_number: string
         }
         Insert: {
+          client_id?: string | null
           created_at?: string
           created_by?: string | null
           description?: string
           id?: string
           product_id?: string | null
+          service_type_id?: string | null
           status?: string
           total_quantity?: number
           updated_at?: string
           wo_number: string
         }
         Update: {
+          client_id?: string | null
           created_at?: string
           created_by?: string | null
           description?: string
           id?: string
           product_id?: string | null
+          service_type_id?: string | null
           status?: string
           total_quantity?: number
           updated_at?: string
@@ -222,10 +276,24 @@ export type Database = {
         }
         Relationships: [
           {
+            foreignKeyName: "work_orders_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "work_orders_product_id_fkey"
             columns: ["product_id"]
             isOneToOne: false
             referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "work_orders_service_type_id_fkey"
+            columns: ["service_type_id"]
+            isOneToOne: false
+            referencedRelation: "service_types"
             referencedColumns: ["id"]
           },
         ]
